@@ -1,0 +1,15 @@
+# Nonlinear System Parameters
+model_params:
+  n_states: 3
+  n_inputs: 1
+  l: 1.0  # Length of the vehicle
+  v: 1.0  # Velocity of the vehicle
+  lf: 1.0  # Front wheelbase
+  lr: 1.0  # Rear wheelbase
+
+# Linearization Parameters (Sample values, make up as needed)
+mpc_params:
+  dt: 0.03
+  b: 0.2
+  c: 0.3
+  d: 0.4
