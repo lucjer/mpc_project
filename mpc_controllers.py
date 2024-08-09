@@ -1,4 +1,6 @@
 import numpy as np
+import osqp as op
+import scipy as sp
 
 class MPCController:
     def __init__(self, model, Q, R, S, n_horizon):
@@ -63,6 +65,8 @@ class MPCController:
 
 
     def get_gamma_lambda_y(self, x_operating, u_operating, n_horizon):
+        print(self.get_gamma_lambda_x(x_operating, u_operating, n_horizon).shape)
+        input()
         return self.get_gamma_lambda_x(x_operating, u_operating, n_horizon)
 
 
@@ -72,25 +76,23 @@ class MPCController:
         Q_np = np.kron(np.eye(n_horizon), self.Q)
         R_np = np.kron(np.eye(n_horizon), self.R)
         S_np = np.kron(np.eye(n_horizon), self.S)
-        # H = 2 * (lambda_y.transpose() @ Q_np @ lambda_y)
         H = 2 * (np.matmul(np.matmul(lambda_y.transpose(), Q_np), lambda_y) + R_np)
         f = 2 * np.matmul(np.matmul((gamma_y - y_ref).transpose(), Q_np), lambda_y)
-        if False:
-          print("Q_np ")
-          print(Q_np)
-          print("R_np ")
-          print(R_np)
-          print("S_np ")
-          print(S_np)
-          print("lambda_y")
-          print(lambda_y)
-          print("gamma_y")
-          print(gamma_y)
-          print("y_ref")
-          print(y_ref)
-          print("H ")
-          print(H)
-          print("f")
-          print(f)
-
         return H, f
+    
+    def set_up_solve_QP(self, X, U):
+        n_inputs = self.model.n_inputs
+        n_horizon = self.n_horizon
+        # QP Setup
+        G_x, L_x = self.get_gamma_lambda_x(X, U, n_horizon)
+        H, f = self.build_hessian_f(self.Q, self.R, self.S, L_x, G_x, X, n_horizon)
+        A = np.eye((n_inputs * n_horizon))
+        l = - np.ones((n_inputs * n_horizon)) * np.pi/4
+        u = + np.ones((n_inputs * n_horizon)) * np.pi/4
+        H_sparse = sp.sparse.csc_matrix(H)
+        A_sparse = sp.sparse.csc_matrix(A)
+        m = op.OSQP()
+        m.setup(P=H_sparse, q=f.transpose(), A=A_sparse, l=l, u=u, verbose=False)
+        results = m.solve()
+        return results
+        
