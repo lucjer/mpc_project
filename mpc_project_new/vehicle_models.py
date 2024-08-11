@@ -26,7 +26,6 @@ class MPCModel(metaclass=abc.ABCMeta):
     def step_nonlinear_model(self, state, input):
         """Discrete-time nonlinear model. Returns x_(i+1) given x_i and u_i."""
         pass
-      
 
 
 class UnicycleConstantSpeed(MPCModel):
@@ -122,40 +121,36 @@ class KinematicBicycleConstantSpeed(MPCModel):
     
     return state_dot
   
-  def linearization_model(self, state, input, debug=False):
-    if debug:
-      return np.ones((3, 3)), np.ones((3, 1))
-    l_front = self.model_params['l_f']
-    l_rear = self.model_params['l_r']
-    v = self.model_params['v']
-    theta = state[2]
-    delta = input[0]
-    
-    # Calculate beta
-    alpha = l_rear / (l_front + l_rear)
-    beta = np.arctan(alpha * np.tan(delta))
-    d_beta_dtan_delta = 1 / (alpha**2 * np.tan(delta)**2 + 1)
-    d_tan_delta_d_delta = 1 / (np.cos(delta)**2) * alpha
-    # d_beta_d_delta = (l_rear / (l_front + l_rear)) / (np.cos(delta)**2 + (l_rear / (l_front + l_rear))**2 * np.tan(delta)**2)
-    d_beta_d_delta = d_beta_dtan_delta * d_tan_delta_d_delta
-    # Jacobian A
-    A = np.zeros((3, 3))
-    A[0, 2] = -v * np.sin(theta + beta)
-    A[1, 2] = v * np.cos(theta + beta)
-    
-    # Jacobian B
-    B = np.zeros((3, 1))
-    B[0, 0] = -v * np.sin(theta + beta) * d_beta_d_delta
-    B[1, 0] = v * np.cos(theta + beta) * d_beta_d_delta
-    B[2, 0] = (v / l_rear) * np.cos(beta) * d_beta_d_delta
-    
-    # Jacobian C
-    C = np.zeros((3, 3))
-    return A, B
+  def linearization_model(self, state, input):
+        l_front = self.model_params['l_f']
+        l_rear = self.model_params['l_r']
+        v = self.model_params['v']
+        theta = state[2]
+        delta = input[0]
+        
+        # Calculate beta
+        alpha = l_rear / (l_front + l_rear)
+        beta = np.arctan(alpha * np.tan(delta))
+        d_beta_dtan_delta = 1 / (alpha**2 * np.tan(delta)**2 + 1)
+        d_tan_delta_d_delta = 1 / (np.cos(delta)**2) * alpha
+        # d_beta_d_delta = (l_rear / (l_front + l_rear)) / (np.cos(delta)**2 + (l_rear / (l_front + l_rear))**2 * np.tan(delta)**2)
+        d_beta_d_delta = d_beta_dtan_delta * d_tan_delta_d_delta
+        # Jacobian A
+        A = np.zeros((3, 3))
+        A[0, 2] = -v * np.sin(theta + beta)
+        A[1, 2] = v * np.cos(theta + beta)
+        
+        # Jacobian B
+        B = np.zeros((3, 1))
+        B[0, 0] = -v * np.sin(theta + beta) * d_beta_d_delta
+        B[1, 0] = v * np.cos(theta + beta) * d_beta_d_delta
+        B[2, 0] = (v / l_rear) * np.cos(beta) * d_beta_d_delta
+        
+        # Jacobian C
+        C = np.zeros((3, 3))
+        return A, B
 
-  def step_nonlinear_model(self, state, input, debug=False):
-    if debug:
-      return state
+  def step_nonlinear_model(self, state, input):
     new_state = np.zeros((3, 1))
     l_front = self.model_params['l_f']
     l_rear = self.model_params['l_r']
