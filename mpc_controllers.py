@@ -1,98 +1,138 @@
+# This class is loosely inspired by matsseig MPC implementation
+# https://github.com/matssteinweg/Multi-Purpose-MPC/blob/master/src/MPC.py
+# Important reference used for the implementation of the MPC controller
+# https://cse.lab.imtlucca.it/~bemporad/publications/papers/ijc_rtiltv.pdf
+
+import osqp
 import numpy as np
-import osqp as op
-import scipy as sp
-
-class MPCController:
-    def __init__(self, model, Q, R, S, n_horizon):
-      self.model = model
-      self.Q = Q
-      self.R = R
-      self.S = S
-      self.n_horizon = n_horizon
-      self.previous_state = None # Collects previous ot
-      self.previous_input = None
+from scipy import sparse
+import utils as utils 
+import matplotlib.pyplot as plt
 
 
-    def get_gamma_lambda_x(self, x_operating, u_operating, n_horizon):
+
+class GenericNMPC:
+    def __init__(self, model, N, Q, R, QN, StateConstraints, InputConstraints):
         """
-        x_operating: vector of current operating states (n_horizon - dimensional vector of n_states vectors)
-        u_operating: vector of current operating inputs (n_horizon - dimensional vector of n_inputs vectors)
-        n_horizon: length of the prediction horizon for MPC formulation
-        model: nonlinear function (function of state and input - f(x, u))
+        Generic MPC constructor for SQP optimization
+        :param model: dynamical system model
+        :param N: horizon | int
+        :param nx: state dimension
+        :param nu: input dimension
+        :param Q: state cost matrix
+        :param R: input cost matrix
+        :param QN: final state cost matrix        
+        :param StateConstraints: dict of state constraints
+        :param InputConstraints: dict of input constraints
         """
-        n_states = self.model.n_states
-        n_inputs = self.model.n_inputs
-        n_horizon = self.n_horizon
-        gamma_x = np.zeros((n_states * n_horizon, 1))
-        lambda_x = np.zeros((n_states * n_horizon, n_inputs * n_horizon))
-        A_0, B_0 = self.get_linearization_at(x_operating[0:n_states, :],
-                                             u_operating[0:n_inputs, :])
-        l_0 = self.get_l_inhomogeneous_term(x_operating[0:n_states, :],
-                                            u_operating[0:n_inputs, :],
-                                            A_0, B_0, None, 0)
-        gamma_i = l_0
-        gamma_x[0:n_states] = gamma_i
-        lambda_x[0:n_states, 0:n_inputs] = B_0
 
-        for i in range(1, n_horizon):
-            A_i, B_i = self.get_linearization_at(x_operating[i*n_states:(i+1)* n_states, :],
-                                                 u_operating[i*n_inputs:(i+1)* n_inputs, :])
-            l_i = self.get_l_inhomogeneous_term(x_operating[i*n_states:(i+1)* n_states, :],
-                                                u_operating[i*n_inputs:(i+1)* n_inputs, :],
-                                                A_i,
-                                                B_i, None, i)
-            gamma_i = np.matmul(A_i, gamma_i) + l_i
-            gamma_x[i*n_states:(i+1)*n_states] = gamma_i
-            lambda_x[i*n_states:(i+1)*n_states, i*n_inputs:(i+1)*n_inputs] = B_i
-            for j in range(i):
-                lambda_x[i*n_states:(i+1)*n_states, j*n_inputs:(j+1)*n_inputs] = \
-                np.matmul(A_i, lambda_x[(i-1)*n_states:(i)*n_states, j*n_inputs:(j+1)*n_inputs])
-        return gamma_x, lambda_x
-
-
-    def get_l_inhomogeneous_term(self, x_star, u_star, A_i, B_i, model, i):
-          if i == 0:
-              return self.model.step_nonlinear_model(x_star, u_star) - \
-              np.matmul(B_i, u_star)
-          else:
-              return self.model.step_nonlinear_model(x_star, u_star) - \
-              np.matmul(B_i, u_star) - np.matmul(A_i, x_star)
-
-
-    def get_linearization_at(self, x, u):
-        A, B = self.model.linearization_model(x, u)
-        return A, B
-
-
-    def get_gamma_lambda_y(self, x_operating, u_operating, n_horizon):
-        print(self.get_gamma_lambda_x(x_operating, u_operating, n_horizon).shape)
-        input()
-        return self.get_gamma_lambda_x(x_operating, u_operating, n_horizon)
-
-
-    def build_hessian_f(self, Q_state, R_input, S_input_variation,
-                      lambda_y, gamma_y, y_ref,
-                      n_horizon):
-        Q_np = np.kron(np.eye(n_horizon), self.Q)
-        R_np = np.kron(np.eye(n_horizon), self.R)
-        S_np = np.kron(np.eye(n_horizon), self.S)
-        H = 2 * (np.matmul(np.matmul(lambda_y.transpose(), Q_np), lambda_y) + R_np)
-        f = 2 * np.matmul(np.matmul((gamma_y - y_ref).transpose(), Q_np), lambda_y)
-        return H, f
-    
-    def set_up_solve_QP(self, X, U):
-        n_inputs = self.model.n_inputs
-        n_horizon = self.n_horizon
-        # QP Setup
-        G_x, L_x = self.get_gamma_lambda_x(X, U, n_horizon)
-        H, f = self.build_hessian_f(self.Q, self.R, self.S, L_x, G_x, X, n_horizon)
-        A = np.eye((n_inputs * n_horizon))
-        l = - np.ones((n_inputs * n_horizon)) * np.pi/4
-        u = + np.ones((n_inputs * n_horizon)) * np.pi/4
-        H_sparse = sp.sparse.csc_matrix(H)
-        A_sparse = sp.sparse.csc_matrix(A)
-        m = op.OSQP()
-        m.setup(P=H_sparse, q=f.transpose(), A=A_sparse, l=l, u=u, verbose=False)
-        results = m.solve()
-        return results
+        # Parameters
+        self.N = N # Prediction Horizon
+        self.Q = Q  # State cost
+        self.R = R  # Input cost
+        self.QN = QN # Final state cost
         
+        # Model and Dimensions
+        self.model = model
+        self.nx = model.n_states
+        self.nu = model.n_inputs
+        
+        # Constraints
+        self.state_constraints = StateConstraints
+        self.input_constraints = InputConstraints       
+
+        # Current state and control
+        self.current_prediction = None
+        self.current_control = np.zeros((self.nu * self.N))
+        
+        # Initialize the optimizer
+        self.optimizer = osqp.OSQP()
+        print("MPC Class initialized successfully")
+    
+    def solve_sqp(self, current_state, X_ref, U_ref, debug=False, sqp_iter=1):
+        """
+        Initialize the optimization problem.
+        :param X: current reference state
+        :param U: current control
+        """
+        # Initialize guess for the optimization problem - SQP
+        X_guess = X_ref.copy()
+        U_guess = U_ref.copy()
+        
+        # To store the evolution of X_ref over iterations
+        X_ref_evolution = [X_guess.copy()]
+
+        # Iterate over horizon
+        for j in range(sqp_iter):
+            # LTV System Matrices
+            A = np.zeros((self.nx * (self.N), self.nx * (self.N)))
+            B = np.zeros((self.nx * (self.N), self.nu * (self.N)))
+            
+            # First order correction
+            r = np.zeros((self.nx * (self.N), ))
+            r[0: self.nx] = self.model.step_nonlinear_model(current_state, U_guess[0]) - X_guess[0]
+            
+            for k in range(self.N - 1):
+                # Fetch current guess at step k for state and input
+                state_guess_k = X_guess[k]
+                input_guess_k = U_guess[k]
+                
+                # Compute LTV matrices - Linearization at current time step
+                A_lin, B_lin = self.model.linearization_model(state_guess_k, input_guess_k)
+                A[(k + 1) * self.nx: (k + 2) * self.nx, k * self.nx:(k + 1) * self.nx] = A_lin
+                B[(k + 1) * self.nx: (k + 2) * self.nx, k * self.nu:(k + 1) * self.nu] = B_lin 
+                
+                # Compute the first order correction
+                r[(k + 1) * self.nx: (k + 2) * self.nx] = self.model.step_nonlinear_model(state_guess_k, input_guess_k) - X_guess[k+1] 
+            
+            Ax = sparse.kron(sparse.eye(self.N), - sparse.eye(self.nx)) + sparse.csc_matrix(A)
+            Bu = sparse.csc_matrix(B)
+            Aeq = sparse.hstack([Ax, Bu])
+            Aineq = sparse.eye((self.N) * self.nx + self.N * self.nu)
+            A = sparse.vstack([Aeq, Aineq], format='csc')
+
+            lineq = np.hstack([-np.inf, -np.inf, -np.inf] * (self.N) + [-np.inf] * self.N)
+            uineq = np.hstack([np.inf, np.inf, np.inf] * (self.N) + [np.inf] * self.N)
+            leq = - r
+            ueq = - r
+            l = np.hstack([leq, lineq])
+            u = np.hstack([ueq, uineq])
+
+            P = sparse.block_diag([sparse.kron(sparse.eye(self.N), self.Q),
+                sparse.kron(sparse.eye(self.N), self.R)], format='csc')
+            
+            xug = np.hstack([np.concatenate(X_guess), np.concatenate(U_guess)])
+            xur = np.hstack([np.concatenate(X_ref), np.concatenate(U_ref)])
+            delta_X = xug - xur      
+            q = P.dot(delta_X)
+
+            self.optimizer = osqp.OSQP()
+            self.optimizer.setup(P=P, q=q, A=A, l=l, u=u, verbose=False)
+            dec = self.optimizer.solve()
+            delta_u = np.array(dec.x[-self.N * self.nu:])
+            delta_x = np.reshape(dec.x[:(self.N) * self.nx], (self.N, self.nx))
+            
+            print("U_guess")
+            print(U_guess)
+            input()
+            
+            # Update guesses
+            for i in range(self.N):
+                X_guess[i] = X_guess[i] + delta_x[i] * 0.1
+            for i in range(self.N):
+                U_guess[i] = U_guess[i] + delta_u[i] * 0.1
+            
+            # Store the current X_guess to track evolution
+            X_ref_evolution.append(X_guess.copy())
+
+        # Plotting X_ref evolution
+        utils.plot_xref_evolution(X_ref_evolution, filename="evolution_sqp.pdf")
+
+        return X_guess, U_guess
+
+           
+
+
+        
+        
+

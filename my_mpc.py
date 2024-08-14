@@ -7,14 +7,14 @@ from tqdm import tqdm
 from scipy import sparse
 
 import vehicle_models as vm
-import mpc_controllers_new as mpc
-import mpc_project_new.utils as utils 
+import mpc_controllers as mpc
+import utils as utils 
 
 
 
 # MPC CONTROLLER INITIALIZATION
 model_kin = vm.KinematicBicycleConstantSpeed('mpc_bicycle_config.yaml')
-N = 5
+N = 8
 Q = sparse.diags([1, .2, 1.0])
 R = sparse.diags([2.5])
 QN = sparse.diags([.1, .1, .1])
@@ -25,11 +25,11 @@ StateConstraints = {'xmin': np.array([-np.inf, -np.inf, -np.inf]),
 mpc_test_2 = mpc.GenericNMPC(model=model_kin, N=N, Q = Q, R=R, QN=Q, StateConstraints=StateConstraints, InputConstraints=InputConstraints) 
 
 # SOLVE NMPC PROBLEM
-current_state = np.array([.0, 0.2, 0.])
+current_state = np.array([.0, 1.5, 0.])
 X_ref = [np.array([1.0 * (i+1), 0., 0.0]) for i in range(N)]
 U_ref = [np.zeros((1, )) for i in range(N)]
 
-X_guesss, U_guesss = mpc_test_2.solve_sqp(current_state, X_ref, U_ref, debug = False, sqp_iter=1)
+X_guesss, U_guesss = mpc_test_2.solve_sqp(current_state, X_ref, U_ref, debug = False, sqp_iter=20)
 control_input = U_guesss[0]
 print(control_input)
 

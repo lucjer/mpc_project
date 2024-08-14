@@ -258,7 +258,8 @@ def plot_xref_evolution(X_ref_evolution, filename="xref_evolution.pdf"):
     plt.xlabel('X Position')
     plt.ylabel('Y Position')
     plt.axis('equal')
-    plt.legend()
+    if N < 5:
+        plt.legend()
     
     plt.tight_layout()
     
