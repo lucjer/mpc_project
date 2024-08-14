@@ -2,6 +2,7 @@
 import math
 import numpy as np
 import bisect
+import matplotlib.pyplot as plt
 
 
 class Spline:
@@ -216,7 +217,7 @@ def main():  # pragma: no cover
     plt.subplots(1)
     plt.plot(s, [np.rad2deg(iyaw) for iyaw in ryaw], "-r", label="yaw")
     plt.grid(True)
-    plt.legend()
+    plt.legend(loc='best')
     plt.xlabel("line length[m]")
     plt.ylabel("yaw angle[deg]")
 
@@ -228,3 +229,42 @@ def main():  # pragma: no cover
     plt.ylabel("curvature [1/m]")
 
     plt.show()
+
+
+def plot_xref_evolution(X_ref_evolution, filename="xref_evolution.pdf"):
+    """
+    Plots the evolution of X_ref over the iterations of the SQP algorithm,
+    including yaw angles on the trajectories.
+    
+    Args:
+        X_ref_evolution (list of lists): A list containing X_ref at each iteration.
+        filename (str): The filename where the plot will be saved.
+    """
+    N = len(X_ref_evolution)
+    
+    plt.figure(figsize=(10, 5))
+    
+    # Plot X_ref evolution trajectory with yaw angles
+    for i in range(N):
+        x_positions = [state[0] for state in X_ref_evolution[i]]
+        y_positions = [state[1] for state in X_ref_evolution[i]]
+        yaw_angles = [state[2] for state in X_ref_evolution[i]]
+        
+        # Plot trajectory with yaw angles
+        plt.quiver(x_positions, y_positions, np.cos(yaw_angles), np.sin(yaw_angles), angles='xy', scale_units='xy', scale=5, alpha=0.6)
+        plt.scatter(x_positions, y_positions, label=f'Iteration {i+1}', alpha=0.6)
+    
+    plt.title('Trajectory Evolution with Yaw Angles')
+    plt.xlabel('X Position')
+    plt.ylabel('Y Position')
+    plt.axis('equal')
+    plt.legend()
+    
+    plt.tight_layout()
+    
+    # Save the plot as a PDF file
+    plt.savefig(filename)
+    plt.close()
+
+
+

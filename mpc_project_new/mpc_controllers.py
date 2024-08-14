@@ -47,7 +47,7 @@ class GenericNMPC:
         self.optimizer = osqp.OSQP()
         print("MPC Class initialized successfully")
     
-    def _init_problem(self, current_state, X_ref, U_ref):
+    def _init_problem(self, current_state, X_ref, U_ref, sqp_iter):
         """
         Initialize the optimization problem.
         :param X: current reference state
@@ -72,8 +72,8 @@ class GenericNMPC:
         r[0: self.nx] = current_state - X_guess[0]
         
         # Iterate over horizon
-        sqp_steps = 10
-        for j in range(sqp_steps):
+        
+        for j in range(sqp_iter):
             for k in range(self.N):
                 # Fetch current guess at step k for state and input
                 state_guess_k = X_guess[k]

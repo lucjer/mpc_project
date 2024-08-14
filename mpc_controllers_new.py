@@ -1,12 +1,14 @@
 # This class is loosely inspired by matsseig MPC implementation
 # https://github.com/matssteinweg/Multi-Purpose-MPC/blob/master/src/MPC.py
 # Important reference used for the implementation of the MPC controller
-# https://cse.lab.imtlucca.it/~bemporad/teaching/mpc/imt/2-ltv_nl_mpc.pdf
-# 
+# https://cse.lab.imtlucca.it/~bemporad/publications/papers/ijc_rtiltv.pdf
 
 import osqp
 import numpy as np
 from scipy import sparse
+import mpc_project_new.utils as utils 
+import matplotlib.pyplot as plt
+
 
 
 class GenericNMPC:
@@ -47,137 +49,89 @@ class GenericNMPC:
         self.optimizer = osqp.OSQP()
         print("MPC Class initialized successfully")
     
-    def _init_problem(self, current_state, X_ref, U_ref, debug=False):
+    def solve_sqp(self, current_state, X_ref, U_ref, debug=False, sqp_iter=1):
         """
         Initialize the optimization problem.
         :param X: current reference state
         :param U: current control
         """
         # Initialize guess for the optimization problem - SQP
+        X_ref.append(current_state)
         X_guess = X_ref.copy()
         U_guess = U_ref.copy()
         
-        # Constraints
-        
-        #umin = self.input_constraints['umin']
-        #umax = self.input_constraints['umax']
-        #dxmin = self.state_constraints['xmin']
-        #dxmax = self.state_constraints['xmax']
+        # To store the evolution of X_ref over iterations
+        X_ref_evolution = [X_guess.copy()]
 
-        # LTV System Matrices
-        A = np.zeros((self.nx * (self.N + 1), self.nx * (self.N + 1)))
-        B = np.zeros((self.nx * (self.N + 1), self.nu * (self.N)))
-        # First order correction
-        r = np.zeros((self.nx * (self.N + 1), ))
-        r[0: self.nx] = current_state - X_guess[0]
-        
-        
         # Iterate over horizon
-        sqp_steps = 1
-        for j in range(sqp_steps):
+        for j in range(sqp_iter):
+            # LTV System Matrices
+            A = np.zeros((self.nx * (self.N + 1), self.nx * (self.N + 1)))
+            B = np.zeros((self.nx * (self.N + 1), self.nu * (self.N)))
+            
+            # First order correction
+            r = np.zeros((self.nx * (self.N + 1), ))
+            
+            r[0: self.nx] = (current_state - X_guess[0])  
             for k in range(self.N):
                 # Fetch current guess at step k for state and input
                 state_guess_k = X_guess[k]
                 input_guess_k = U_guess[k]
-                print("State Guess")
-                print(state_guess_k)
-                print("Current State")
-                print(current_state)
-                input()
-            
                 
                 # Compute LTV matrices - Linearization at current time step
-                A_lin, B_lin = self.model.linearization_model(state_guess_k, input_guess_k, debug=debug)
+                A_lin, B_lin = self.model.linearization_model(state_guess_k, input_guess_k)
                 A[(k + 1) * self.nx: (k + 2) * self.nx, k * self.nx:(k + 1) * self.nx] = A_lin
                 B[(k + 1) * self.nx: (k + 2) * self.nx, k * self.nu:(k + 1) * self.nu] = B_lin 
-                r[(k + 1) * self.nx: (k + 2) * self.nx] = X_guess[k] - self.model.step_nonlinear_model(state_guess_k, input_guess_k, debug=debug) + k
-
+                
                 # Compute the first order correction
+                r[(k + 1) * self.nx: (k + 2) * self.nx] = self.model.step_nonlinear_model(state_guess_k, input_guess_k) - X_guess[k+1] 
             
             Ax = sparse.kron(sparse.eye(self.N + 1), - sparse.eye(self.nx)) + sparse.csc_matrix(A)
             Bu = sparse.csc_matrix(B)
             Aeq = sparse.hstack([Ax, Bu])
             Aineq = sparse.eye((self.N + 1) * self.nx + self.N * self.nu)
-            # Combine constraint matrices
             A = sparse.vstack([Aeq, Aineq], format='csc')
 
-            # Get upper and lower bound vectors for equality constraints
             lineq = np.hstack([-np.inf, -np.inf, -np.inf] * (self.N + 1) + [-np.inf] * self.N)
-            print(lineq.shape)
             uineq = np.hstack([np.inf, np.inf, np.inf] * (self.N + 1) + [np.inf] * self.N)
-            print(uineq.shape)
-            input()
-            # Get upper and lower bound vectors for inequality constraints
-            leq = r
-            ueq = r
-            # Combine upper and lower bound vectors
-            print("l shape")
+            leq = - r
+            ueq = - r
             l = np.hstack([leq, lineq])
-            print(l.shape)
-            print("A shape")
-            print(A.shape)
             u = np.hstack([ueq, uineq])
-            input()
 
-            # Set cost matrices
             P = sparse.block_diag([sparse.kron(sparse.eye(self.N), self.Q), self.QN,
                 sparse.kron(sparse.eye(self.N), self.R)], format='csc')
             
-            # Initialize guess for the optimization problem - SQP
-
-
-            # Concatenate the guess and reference vectors
-            print("Info before hstack")
-            print(np.concatenate(X_guess))
-            print(np.concatenate(U_guess))
-            input()
             xug = np.hstack([np.concatenate(X_guess), np.concatenate(U_guess)])
             xur = np.hstack([np.concatenate(X_ref), np.concatenate(U_ref)])
-            # Compute the difference delta_X
-            delta_X = xug - xur
-            print(delta_X.shape)
-            print(P.shape)
-            input()            
+            delta_X = xug - xur      
             q = P.dot(delta_X)
 
-
-            # Initialize optimizer
             self.optimizer = osqp.OSQP()
             self.optimizer.setup(P=P, q=q, A=A, l=l, u=u, verbose=False)
+            dec = self.optimizer.solve()
+            delta_u = np.array(dec.x[-self.N * self.nu:])
+            delta_x = np.reshape(dec.x[:(self.N+1) * self.nx], (self.N+1, self.nx))
+            
+            print("U_guess")
+            print(U_guess)
+            input()
+            
+            # Update guesses
+            for i in range(self.N + 1):
+                X_guess[i] = X_guess[i] + delta_x[i] * 0.5
+            for i in range(self.N):
+                U_guess[i] = U_guess[i] + delta_u[i] * 0.5
+            
+            # Store the current X_guess to track evolution
+            X_ref_evolution.append(X_guess.copy())
 
-            if False:
-                # Get equality matrix - Dynamics Constraints 
-                Ax = sparse.kron(sparse.eye(self.N + 1), - sparse.eye(self.nx)) + sparse.csc_matrix(A)
-                Bu = sparse.csc_matrix(B)
-                Aeq = sparse.hstack([Ax, Bu])
-                
-                # Get inequality matrix
-                Aineq = sparse.eye((self.N + 1) * self.nx + self.N * self.nu)
-                # Combine constraint matrices
-                A = sparse.vstack([Aeq, Aineq], format='csc')
+        # Plotting X_ref evolution
+        utils.plot_xref_evolution(X_ref_evolution, filename="evolution_sqp.pdf")
 
-                # Get upper and lower bound vectors for equality constraints
-                lineq = np.hstack([xmin_dyn,
-                                np.kron(np.ones(self.N), umin)])
-                uineq = np.hstack([xmax_dyn, umax_dyn])
-                # Get upper and lower bound vectors for inequality constraints
-                leq = np.hstack([-x0, uq])
-                ueq = leq
-                # Combine upper and lower bound vectors
-                l = np.hstack([leq, lineq])
-                u = np.hstack([ueq, uineq])
+        return X_guess, U_guess
 
-                # Set cost matrices
-                P = sparse.block_diag([sparse.kron(sparse.eye(self.N), self.Q), self.QN,
-                    sparse.kron(sparse.eye(self.N), self.R)], format='csc')
-                q = np.hstack(
-                    [-np.tile(np.diag(self.Q.A), self.N) * xr[:-self.nx],
-                    -self.QN.dot(xr[-self.nx:]),
-                    -np.tile(np.diag(self.R.A), self.N) * ur])
-
-                # Initialize optimizer
-                self.optimizer = osqp.OSQP()
-                self.optimizer.setup(P=P, q=q, A=A, l=l, u=u, verbose=False)
+           
 
 
         
