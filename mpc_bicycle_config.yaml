@@ -2,13 +2,13 @@
 model_params:
   n_states: 3
   n_inputs: 1
-  l_f: .5 
-  l_r: .5
+  l_f: .8 
+  l_r: .2
   v: 1
   
 # Linearization Parameters (Sample values, make up as needed)
 mpc_params:
-  dt: 1
+  dt: 0.7
   b: 0.2
   c: 0.3
   d: 0.4

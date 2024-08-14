@@ -1,18 +1,24 @@
-# This class is loosely inspired by matsseig MPC implementation
-# https://github.com/matssteinweg/Multi-Purpose-MPC/blob/master/src/MPC.py
-# Important reference used for the implementation of the MPC controller
-# https://cse.lab.imtlucca.it/~bemporad/publications/papers/ijc_rtiltv.pdf
-
 import osqp
 import numpy as np
 from scipy import sparse
 import utils as utils 
+import time
 import matplotlib.pyplot as plt
 
 
+def timer_decorator(func):
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        end_time = time.time()
+        execution_time = end_time - start_time
+        print(f"Execution time: {execution_time} seconds")
+        return result
+    return wrapper
+
 
 class GenericNMPC:
-    def __init__(self, model, N, Q, R, QN, StateConstraints, InputConstraints):
+    def __init__(self, model, N, Q, R, QN, alpha, StateConstraints, InputConstraints):
         """
         Generic MPC constructor for SQP optimization
         :param model: dynamical system model
@@ -49,7 +55,7 @@ class GenericNMPC:
         self.optimizer = osqp.OSQP()
         print("MPC Class initialized successfully")
     
-    def solve_sqp(self, current_state, X_ref, U_ref, debug=False, sqp_iter=1):
+    def solve_sqp(self, current_state, X_ref, U_ref, debug=False, sqp_iter=1, alpha=1.0):
         """
         Initialize the optimization problem.
         :param X: current reference state
@@ -112,27 +118,26 @@ class GenericNMPC:
             delta_u = np.array(dec.x[-self.N * self.nu:])
             delta_x = np.reshape(dec.x[:(self.N) * self.nx], (self.N, self.nx))
             
-            print("U_guess")
-            print(U_guess)
-            input()
+
             
             # Update guesses
             for i in range(self.N):
-                X_guess[i] = X_guess[i] + delta_x[i] * 0.1
+                X_guess[i] = X_guess[i] + delta_x[i] * alpha
             for i in range(self.N):
-                U_guess[i] = U_guess[i] + delta_u[i] * 0.1
+                U_guess[i] = U_guess[i] + delta_u[i] * alpha
             
             # Store the current X_guess to track evolution
             X_ref_evolution.append(X_guess.copy())
 
         # Plotting X_ref evolution
-        utils.plot_xref_evolution(X_ref_evolution, filename="evolution_sqp.pdf")
+        if debug:
+            utils.plot_xref_evolution(X_ref_evolution, filename="evolution_sqp.pdf")
 
         return X_guess, U_guess
 
            
 
 
-        
-        
 
+        
+        

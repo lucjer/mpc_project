@@ -251,15 +251,14 @@ def plot_xref_evolution(X_ref_evolution, filename="xref_evolution.pdf"):
         yaw_angles = [state[2] for state in X_ref_evolution[i]]
         
         # Plot trajectory with yaw angles
-        plt.quiver(x_positions, y_positions, np.cos(yaw_angles), np.sin(yaw_angles), angles='xy', scale_units='xy', scale=5, alpha=0.6)
+        plt.quiver(x_positions, y_positions, np.cos(yaw_angles), np.sin(yaw_angles), angles='xy', scale_units='xy', scale=4, alpha=0.6)
         plt.scatter(x_positions, y_positions, label=f'Iteration {i+1}', alpha=0.6)
     
     plt.title('Trajectory Evolution with Yaw Angles')
     plt.xlabel('X Position')
     plt.ylabel('Y Position')
     plt.axis('equal')
-    if N < 5:
-        plt.legend()
+    plt.legend()
     
     plt.tight_layout()
     
