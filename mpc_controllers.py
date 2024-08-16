@@ -17,7 +17,7 @@ def timer_decorator(func):
     return wrapper
 
 
-class GenericNMPC:
+class NMPCSolver:
     def __init__(self, model, N, Q, R, QN, alpha, StateConstraints, InputConstraints):
         """
         Generic MPC constructor for SQP optimization

@@ -14,7 +14,7 @@ import utils as utils
 
 # MPC CONTROLLER INITIALIZATION
 model_kin = vm.KinematicBicycleConstantSpeed('mpc_bicycle_config.yaml')
-n_horizon = 5
+n_horizon = 15
 Q = sparse.diags([1, 1, .1])
 R = sparse.diags([2.5])
 QN = sparse.diags([.1, .1, .1])
@@ -22,7 +22,7 @@ InputConstraints = {'umin': np.array([-np.inf]),
                     'umax': np.array([np.inf])}
 StateConstraints = {'xmin': np.array([-np.inf, -np.inf, -np.inf]),
                     'xmax': np.array([np.inf, np.inf, np.inf])}
-mpc_test_2 = mpc.GenericNMPC(model=model_kin, N=n_horizon, Q = Q, R=R, QN=Q,
+mpc_test_2 = mpc.NMPCSolver(model=model_kin, N=n_horizon, Q = Q, R=R, QN=Q,
                              StateConstraints=StateConstraints,
                              InputConstraints=InputConstraints,
                              alpha = 0.5) 
@@ -40,7 +40,7 @@ print(control_input)
 # POPULATE REFERENCE TRAJECTORY
 dt = model_kin.mpc_params['dt']
 x_ref = np.linspace(0,  40 * np.pi, 400)
-y_ref = (np.cos(0.2 * x_ref) * 6 + 2 * np.cos(0.35 * x_ref) * 2) * 2
+y_ref = (np.cos(0.1 * x_ref) * 6 + 2 * np.cos(0.15 * x_ref) * 2) * 2
 v = 1 
 ds = v * dt 
 rx, ry, ryaw, rk, rsteer, s = utils.calc_spline_course(x_ref, y_ref, ds=ds)
@@ -64,7 +64,7 @@ for i in tqdm(range(n_sim)):
   X = total_reference[i:i+n_horizon]
   U = total_reference_input[i:i+n_horizon]
 
-  X_guess, U_guess = mpc_test_2.solve_sqp(current_state, X, U, debug = False, sqp_iter=5, alpha=0.2)
+  X_guess, U_guess = mpc_test_2.solve_sqp(current_state, X, U, debug = False, sqp_iter=10, alpha=0.3)
   opt_input = U_guess[0]
   current_state_pred = current_state.reshape(model_kin.n_states, )
   current_state = model_kin.step_nonlinear_model(current_state, [opt_input]).reshape(model_kin.n_states, 1)
@@ -85,6 +85,31 @@ plt.legend()
 plt.savefig('test.pdf')
 plt.show()
 
-plt.figure()
-plt.plot(time_steps, x_traj)
-plt.savefig('speed.pdf')
+
+
+
+import matplotlib.animation as animation
+
+# Final Plot
+x_traj = [state_history[i][0] for i in range(2, n_sim)]
+y_traj = [state_history[i][1] for i in range(2, n_sim)]
+theta_traj = [state_history[i][2] for i in range(2, n_sim)]
+
+fig, ax = plt.subplots()
+ax.plot(x_ref, y_ref, color='blue', label='reference')
+line, = ax.plot([], [], color='orange', label='trajectory')
+
+def init():
+    line.set_data([], [])
+    return line,
+
+def update(frame):
+    line.set_data(x_traj[:frame], y_traj[:frame])
+    return line,
+
+ani = animation.FuncAnimation(fig, update, frames=n_sim, init_func=init, blit=True)
+
+plt.legend()
+
+# Save the animation
+ani.save('trajectory_animation.gif', writer='imagemagick')
