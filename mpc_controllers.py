@@ -66,7 +66,9 @@ class NMPCSolver:
         U_guess = U_ref.copy()
         
         # To store the evolution of X_ref over iterations
-        X_ref_evolution = [X_guess.copy()]
+        X_guess_evolution = [X_guess.copy()]
+        U_guess_evolution = [U_guess.copy()]
+        cost_evolution = []
 
         # Iterate over horizon
         for j in range(sqp_iter):
@@ -115,28 +117,32 @@ class NMPCSolver:
             self.optimizer = osqp.OSQP()
             self.optimizer.setup(P=P, q=q, A=A, l=l, u=u, verbose=False)
             dec = self.optimizer.solve()
-            delta_u = np.array(dec.x[-self.N * self.nu:])
-            delta_x = np.reshape(dec.x[:(self.N) * self.nx], (self.N, self.nx))
+            delta_U = np.array(dec.x[-self.N * self.nu:])
+            delta_X = np.reshape(dec.x[:(self.N) * self.nx], (self.N, self.nx))
             
 
             
             # Update guesses
             for i in range(self.N):
-                X_guess[i] = X_guess[i] + delta_x[i] * alpha
+                X_guess[i] = X_guess[i] + delta_X[i] * alpha
             for i in range(self.N):
-                U_guess[i] = U_guess[i] + delta_u[i] * alpha
+                U_guess[i] = U_guess[i] + delta_U[i] * alpha
             
             # Store the current X_guess to track evolution
-            X_ref_evolution.append(X_guess.copy())
+            if debug:
+                X_guess_evolution.append(X_guess.copy())
+                U_guess_evolution.append(U_guess.copy())
+                #cost_evolution.append(self.compute_cost(delta_X, delta_U))
 
-        # Plotting X_ref evolution
         if debug:
-            utils.plot_xref_evolution(X_ref_evolution, filename="evolution_sqp.pdf")
-
+            utils.plot_xref_evolution(X_guess_evolution, filename="evolution_sqp.pdf")
+            # TODO: Implement cost evolution - to check convergence
+            # utils.plot_cost_evolution(cost_evolution, filename="cost_evolution_sqp.pdf")
+            
         return X_guess, U_guess
 
-           
-
+    def compute_cost(self, delta_X, delta_U):
+        pass
 
 
         
