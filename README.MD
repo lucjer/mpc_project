@@ -22,7 +22,7 @@ The implementation of the NMPCSolver class draws inspiration from the [MPC class
 
 Given the state estimate \(\hat{x}_i\) and reference trajectories \(\boldsymbol{x}_i^{\text{ref}}\) and \(\boldsymbol{u}_i^{\text{ref}}\), the optimization problem is:
 
-\[
+$$
 \operatorname{NLP}\left(\hat{x}_i, \boldsymbol{x}_i^{\text{ref}}, \boldsymbol{u}_i^{\text{ref}}\right) = \arg \min_{x, u} \sum_{k=0}^{N-1} \frac{1}{2}
 \begin{bmatrix}
 x_{i, k} - x_{i, k}^{\text{ref}} \\
@@ -33,7 +33,7 @@ W_{i, k}
 x_{i, k} - x_{i, k}^{\text{ref}} \\
 u_{i, k} - u_{i, k}^{\text{ref}}
 \end{bmatrix}
-\]
+$$
 
 Subject to:
 
