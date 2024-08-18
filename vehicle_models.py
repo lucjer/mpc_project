@@ -1,6 +1,7 @@
 import abc
 import numpy as np
 import yaml
+import math
 
 
 class MPCModel(metaclass=abc.ABCMeta):
@@ -19,12 +20,19 @@ class MPCModel(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def linearization_model(self, state, input):
-        """Linearized model. Returns linearization (A, B) at operating point (x, u)."""
+        """Linearized model. Returns linearization of discrete time model (A, B) at operating point (x, u)."""
         pass
 
     @abc.abstractmethod
     def step_nonlinear_model(self, state, input):
         """Discrete-time nonlinear model. Returns x_(i+1) given x_i and u_i."""
+        pass
+    
+    @abc.abstractmethod
+    def output_model(self, state, input):
+        """
+        Output model for the vehicle. 
+        """
         pass
       
 
@@ -48,9 +56,9 @@ class UnicycleConstantSpeed(MPCModel):
     delta = input[0]
     
     state_dot = np.zeros((3, 1))
-    x_dot = v * np.cos(theta + delta) 
-    y_dot = v * np.sin(theta + delta) 
-    theta_dot = v * np.sin(delta)
+    x_dot = v * math.cos(theta + delta) 
+    y_dot = v * math.sin(theta + delta) 
+    theta_dot = v * math.sin(delta)
     state_dot[0] = x_dot
     state_dot[1] = y_dot
     state_dot[2] = theta_dot
@@ -75,9 +83,9 @@ class UnicycleConstantSpeed(MPCModel):
     B = np.zeros((3, 1))
     for i in range(3):
       A[i, i] = 1
-    A[0, 2] = - np.cos(theta + delta) * dt
-    A[1, 2] = np.cos(theta + delta) * dt
-    B[2, 0] = np.cos(delta) * dt
+    A[0, 2] = - math.cos(theta + delta) * dt
+    A[1, 2] = math.cos(theta + delta) * dt
+    B[2, 0] = math.cos(delta) * dt
     return A, B
   
   def step_nonlinear_model(self, state, input):
@@ -91,9 +99,9 @@ class UnicycleConstantSpeed(MPCModel):
     theta = state[2]
     delta = input[0]
     new_state = np.zeros((3, 1))
-    x_ = x + v * np.cos(theta + delta) * dt
-    y_ = y + v * np.sin(theta + delta) * dt
-    theta_ = theta + v * np.sin(delta) * dt
+    x_ = x + v * math.cos(theta + delta) * dt
+    y_ = y + v * math.sin(theta + delta) * dt
+    theta_ = theta + v * math.sin(delta) * dt
     new_state[0] = x_
     new_state[1] = y_
     new_state[2] = theta_
@@ -112,9 +120,9 @@ class KinematicBicycleConstantSpeed(MPCModel):
     delta = input[0]
     beta = np.arctan((l_rear / (l_front + l_rear)) * np.tan(delta))
     state_dot = np.zeros((3, ))
-    x_dot = v * np.cos(theta + beta)
-    y_dot = v * np.sin(theta + beta)
-    theta_dot = (v / l_rear) * np.sin(beta)
+    x_dot = v * math.cos(theta + beta)
+    y_dot = v * math.sin(theta + beta)
+    theta_dot = (v / l_rear) * math.sin(beta)
     
     state_dot[0] = x_dot
     state_dot[1] = y_dot
@@ -144,21 +152,21 @@ class KinematicBicycleConstantSpeed(MPCModel):
       alpha = l_rear / (l_front + l_rear)
       beta = np.arctan(alpha * np.tan(delta))
       d_beta_dtan_delta = 1 / (alpha**2 * np.tan(delta)**2 + 1)
-      d_tan_delta_d_delta = 1 / (np.cos(delta)**2) * alpha
+      d_tan_delta_d_delta = 1 / (math.cos(delta)**2) * alpha
       d_beta_d_delta = d_beta_dtan_delta * d_tan_delta_d_delta
       
       # Jacobian A
       A = np.zeros((3, 3))
       for i in range(3):
           A[i, i] = 1 
-      A[0, 2] = -v * np.sin(theta + beta)
-      A[1, 2] = v * np.cos(theta + beta)
+      A[0, 2] = - v * math.sin(theta + beta) * self.mpc_params['dt']
+      A[1, 2] = v * math.cos(theta + beta) * self.mpc_params['dt']
       
       # Jacobian B
       B = np.zeros((3, 1))
-      B[0, 0] = -v * np.sin(theta + beta) * d_beta_d_delta
-      B[1, 0] = v * np.cos(theta + beta) * d_beta_d_delta
-      B[2, 0] = (v / l_rear) * np.cos(beta) * d_beta_d_delta
+      B[0, 0] = -v * math.sin(theta + beta) * d_beta_d_delta * self.mpc_params['dt']
+      B[1, 0] = v * math.cos(theta + beta) * d_beta_d_delta * self.mpc_params['dt']
+      B[2, 0] = (v / l_rear) * math.cos(beta) * d_beta_d_delta * self.mpc_params['dt']
       
       # Jacobian C
       C = np.zeros((3, 3))
@@ -171,7 +179,10 @@ class KinematicBicycleConstantSpeed(MPCModel):
           print("\nMatrix C:")
           print(C)
       
-      return A, B
+      return A, B, C, B 
+    
+  def output_model(self, state, input):
+     return state
 
 
   def step_nonlinear_model(self, state, input, debug=False):
@@ -187,11 +198,140 @@ class KinematicBicycleConstantSpeed(MPCModel):
     delta = input
     beta = np.arctan((l_rear / (l_front + l_rear)) * np.tan(delta))
     state_dot = np.zeros((3, ))
-    x_dot = v * np.cos(theta + beta)
-    y_dot = v * np.sin(theta + beta)
-    theta_dot = (v / l_rear) * np.sin(beta)
+    x_dot = v * math.cos(theta + beta)
+    y_dot = v * math.sin(theta + beta)
+    theta_dot = (v / l_rear) * math.sin(beta)
     
     new_state[0] = x_dot * self.mpc_params['dt'] + x
     new_state[1] = y_dot * self.mpc_params['dt'] + y
     new_state[2] = theta_dot * self.mpc_params['dt'] + theta
     return new_state
+  
+  
+class KinematicBicycleSpatialSpeed(MPCModel):
+  def nonlinear_model(self, state, input):
+    l_front = self.model_params['l_f']
+    l_rear = self.model_params['l_r']
+    dt = self.model_params['dt']
+    
+    # STATES
+    X = state[0]
+    Y = state[1]
+    theta = state[2]
+    v = state[3]
+    s = state[4]
+    
+    # INPUTS
+    delta = input[0]
+    a = input[1]
+    s_dot = input[2]    
+
+    # Update the state vector
+    state_dot = np.zeros((5, 1))
+    beta = np.arctan((l_rear / (l_front + l_rear)) * np.tan(delta))
+    state_dot[0] = v * math.cos(theta + beta)
+    state_dot[1] = v * math.sin(theta + beta)
+    state_dot[2] = (v / l_rear) * math.sin(beta)
+    state_dot[3] = a
+    state_dot[4] = s_dot
+    
+    return state_dot
+  
+  def step_nonlinear_model(self, state, input):
+    l_front = self.model_params['l_f']
+    l_rear = self.model_params['l_r']
+    dt = self.model_params['dt']
+    
+    # STATES
+    X = state[0]
+    Y = state[1]
+    theta = state[2]
+    v = state[3]
+    s = state[4]
+    
+    # INPUTS
+    delta = input[0]
+    a = input[1]
+    s_dot = input[2]    
+
+    # Update the state vector
+    state_dot = np.zeros((5, 1))
+    beta = np.arctan((l_rear / (l_front + l_rear)) * np.tan(delta))
+    state_dot[0] = v * math.cos(theta + beta)
+    state_dot[1] = v * math.sin(theta + beta)
+    state_dot[2] = (v / l_rear) * math.sin(beta)
+    state_dot[3] = a
+    state_dot[4] = s_dot
+    
+    new_state = state + state_dot * dt
+    return new_state
+    
+    
+  def linearize_model(self, model, state, input, debug=False):
+    
+    l_front = self.model_params['l_f']
+    l_rear = self.model_params['l_r']
+    dt = self.model_params['dt']
+    
+    # STATES
+    X = state[0]
+    Y = state[1]
+    theta = state[2]
+    v = state[3]
+    s = state[4]
+    # INPUTS
+    delta = input[0]
+    a = input[1]
+    s_dot = input[2] 
+    
+    A = np.zeros((self.n_states, self.n_states))
+    B = np.zeros((self.n_states, self.n_inputs))
+    alpha = l_rear / (l_front + l_rear)
+    beta = np.arctan(alpha * np.tan(delta))
+    
+    
+    # Calculate the Jacobian A
+    A[0, 2] = - v * math.sin(theta + beta) * self.mpc_params['dt']
+    A[0, 3] = v * math.cos(theta + beta) * self.mpc_params['dt']
+    
+    A[1, 2] = v * math.cos(theta + beta) * self.mpc_params['dt']
+    A[1, 3] = v * math.sin(theta + beta) * self.mpc_params['dt']
+    
+    A[2, 3] = 1/l_rear * math.sin(beta) * self.mpc_params['dt']
+    
+    for i in range(5):
+        A[i, i] = 1
+        
+    # Calculate the Jacobian B
+    B = np.zeros((self.n_states, 1))
+    d_beta_dtan_delta = 1 / (alpha**2 * np.tan(delta)**2 + 1)
+    d_tan_delta_d_delta = 1 / (math.cos(delta)**2) * alpha
+    d_beta_d_delta = d_beta_dtan_delta * d_tan_delta_d_delta
+    B[0, 0] = -v * math.sin(theta + beta) * d_beta_d_delta * self.mpc_params['dt']
+    B[1, 0] = v * math.cos(theta + beta) * d_beta_d_delta * self.mpc_params['dt']
+    B[2, 0] = (v / l_rear) * math.cos(beta) * d_beta_d_delta * self.mpc_params['dt']
+   
+    B[3, 1] = a * self.mpc_params['dt']
+    B[4, 2] = s_dot * self.mpc_params['dt']
+    
+    # Jacobian C
+    C = np.zeros((5, 3))
+    
+    if debug:
+        print("Linearized State Matrix A:")
+        print(A)
+        print("\nLinearized Input Matrix B:")
+        print(B)
+        print("\nMatrix C:")
+        print(C)
+    
+    return A, B, C, C
+  
+  def output_model(self, state, input, theta_ref, x_ref, y_ref):
+     output = np.zeros((self.mpc_params['n_outputs'], 1))
+     alpha = self.model_params['l_r'] / (self.model_params['l_f'] + self.model_params['l_r'])
+     delta = input[0]
+     beta = np.arctan(alpha * np.tan(delta))
+     output[0] = math.sin(theta_ref) * (state[0] - x_ref) - math.cos(theta_ref) * (state[1] - y_ref)
+     output[1] = - math.cos(theta_ref) * (state[0] - x_ref) - math.sin(theta_ref) * (state[1] - y_ref)
+     output[2] =  input[1] * np.sin(beta) + (state[3]**2 / self.model_params['l_r']) * np.sin(beta) * np.cos(beta)

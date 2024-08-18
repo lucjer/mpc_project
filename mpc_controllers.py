@@ -6,15 +6,39 @@ import time
 import matplotlib.pyplot as plt
 
 
+import time
+from functools import wraps
+
+
 def timer_decorator(func):
+    call_count = 0
+    total_time = 0
+
+    @wraps(func)
     def wrapper(*args, **kwargs):
+        nonlocal call_count, total_time
         start_time = time.time()
         result = func(*args, **kwargs)
         end_time = time.time()
         execution_time = end_time - start_time
-        print(f"Execution time: {execution_time} seconds")
+
+        call_count += 1
+        total_time += execution_time
+        average_time = total_time / call_count
+
+        # Convert time to milliseconds and print as integer
+        execution_time_ms = int(execution_time * 1000)
+        average_time_ms = int(average_time * 1000)
+
+        print(f"Execution time: {execution_time_ms} ms")
+        
+        if call_count > 1:  # Print average only after the first call
+            print(f"Average execution time after {call_count} calls: {average_time_ms} ms")
+        
         return result
+
     return wrapper
+
 
 
 class NMPCSolver:
@@ -55,6 +79,7 @@ class NMPCSolver:
         self.optimizer = osqp.OSQP()
         print("MPC Class initialized successfully")
     
+    @timer_decorator
     def solve_sqp(self, current_state, X_ref, U_ref, debug=False, sqp_iter=1, alpha=1.0):
         """
         Initialize the optimization problem.
@@ -86,7 +111,7 @@ class NMPCSolver:
                 input_guess_k = U_guess[k]
                 
                 # Compute LTV matrices - Linearization at current time step
-                A_lin, B_lin = self.model.linearization_model(state_guess_k, input_guess_k)
+                A_lin, B_lin, _, _ = self.model.linearization_model(state_guess_k, input_guess_k)
                 A[(k + 1) * self.nx: (k + 2) * self.nx, k * self.nx:(k + 1) * self.nx] = A_lin
                 B[(k + 1) * self.nx: (k + 2) * self.nx, k * self.nu:(k + 1) * self.nu] = B_lin 
                 
@@ -120,8 +145,6 @@ class NMPCSolver:
             delta_U = np.array(dec.x[-self.N * self.nu:])
             delta_X = np.reshape(dec.x[:(self.N) * self.nx], (self.N, self.nx))
             
-
-            
             # Update guesses
             for i in range(self.N):
                 X_guess[i] = X_guess[i] + delta_X[i] * alpha
@@ -140,8 +163,8 @@ class NMPCSolver:
             # utils.plot_cost_evolution(cost_evolution, filename="cost_evolution_sqp.pdf")
             
         return X_guess, U_guess
-
-    def compute_cost(self, delta_X, delta_U):
+    
+    def compute_cost_evolution(self, U_guess, current_state, X_ref):
         pass
 
 

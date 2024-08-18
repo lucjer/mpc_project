@@ -14,8 +14,8 @@ import utils as utils
 
 # MPC CONTROLLER INITIALIZATION
 model_kin = vm.KinematicBicycleConstantSpeed('mpc_bicycle_config.yaml') 
-n_horizon = 15
-Q = sparse.diags([1, 10, 10])
+n_horizon = 5
+Q = sparse.diags([10, 10, 100])
 R = sparse.diags([2.8])
 QN = sparse.diags([.1, .1, .1])
 # TODO: Implementation of input and state constraints handling
@@ -33,7 +33,7 @@ current_state = np.array([.0, 4.5, 0.])
 X_ref = [np.array([1.0 * (i+1) * model_kin.mpc_params['dt'], 0., 0.0]) for i in range(n_horizon)]
 U_ref = [np.zeros((1, )) for i in range(n_horizon)]
 
-X_guesss, U_guesss = mpc_test_2.solve_sqp(current_state, X_ref, U_ref, debug = True, sqp_iter=5, alpha=0.1)
+X_guesss, U_guesss = mpc_test_2.solve_sqp(current_state, X_ref, U_ref, debug = True, sqp_iter=10, alpha=0.1)
 control_input = U_guesss[0]
 print(control_input)
 input()
@@ -46,7 +46,7 @@ n_total_traj = len(total_reference)
 
 
 # INITIALIZE SIMULATION
-current_state = np.array([100.0, -15, 0.5])
+current_state = np.array([0, 15, 0.5])
 state_history = [current_state]
 input_history = []
 initial_index = utils.find_start_index(current_state, n_horizon, total_reference, total_reference_input)
@@ -92,6 +92,7 @@ theta_traj = [state_history[i][2] for i in range(2, n_sim)]
 
 fig, ax = plt.subplots()
 ax.plot(x_ref, y_ref, color='blue', label='reference')
+ax.axis('equal')
 line, = ax.plot([], [], color='orange', label='trajectory')
 
 def init():
