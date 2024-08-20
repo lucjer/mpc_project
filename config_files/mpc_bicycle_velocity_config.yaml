@@ -1,0 +1,15 @@
+# Nonlinear System Parameters
+model_params:
+  n_states: 4
+  n_inputs: 2
+  n_outputs: 3
+  l_f: .8 
+  l_r: .2
+  v: 1
+  
+# Linearization Parameters (Sample values, make up as needed)
+mpc_params:
+  dt: .2
+  b: 0.2
+  c: 0.3
+  d: 0.4

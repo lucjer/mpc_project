@@ -197,6 +197,16 @@ def compute_reference(dt, x_ref, y_ref, v = 1):
       total_reference_input.append(np.array([rsteer_i]))
     return total_reference,total_reference_input
 
+def compute_reference_velocity_test(dt, x_ref, y_ref, v = 1):
+    ds = v * dt 
+    rx, ry, ryaw, rk, rsteer, s = calc_spline_course(x_ref, y_ref, ds=ds)
+    total_reference = []
+    total_reference_input = []
+    for rx_i, ry_i, ryaw_i, rsteer_i in zip(rx, ry, ryaw, rsteer):
+      total_reference.append(np.array([rx_i, ry_i, ryaw_i, v]))
+      total_reference_input.append(np.array([rsteer_i, 0]))
+    return total_reference,total_reference_input
+
 
 
 def plot_xref_evolution(X_ref_evolution, filename="xref_evolution.pdf"):

@@ -158,10 +158,11 @@ class NMPCSolverOutput():
             self.optimizer.setup(P=P, q=q, A=A_states, l=l, u=u, verbose=False)
             dec = self.optimizer.solve()
             delta_U = np.array(dec.x[-self.N * self.nu:])
-            delta_X = np.reshape(dec.x[:(self.N) * self.nx], (self.N, self.nx))
+            delta_X = np.reshape(dec.x[:self.N * self.nx], (self.N, self.nx))
             
             # Update guesses
             for i in range(self.N):
+                print(delta_X[i])
                 X_guess[i] = X_guess[i] + delta_X[i] * alpha
             for i in range(self.N):
                 U_guess[i] = U_guess[i] + delta_U[i] * alpha
@@ -224,15 +225,19 @@ class NMPCSolver:
         print("MPC Class initialized successfully")
     
     @timer_decorator
-    def solve_sqp(self, current_state, X_ref, U_ref, debug=False, sqp_iter=1, alpha=1.0):
+    def solve_sqp(self, current_state, X_ref, U_ref, X_guess=None, U_guess=None, debug=False, sqp_iter=1, alpha=1.0):
         """
         Initialize the optimization problem.
         :param X: current reference state
         :param U: current control
         """
         # Initialize guess for the optimization problem - SQP
-        X_guess = X_ref.copy()
-        U_guess = U_ref.copy()
+        if X_guess is None or U_guess is None:
+            X_guess = X_ref.copy()
+            U_guess = U_ref.copy()
+        else:
+            X_guess = X_guess.copy()
+            U_guess = U_guess.copy()
         
         # To store the evolution of X_ref over iterations
         X_guess_evolution = [X_guess.copy()]
@@ -247,6 +252,7 @@ class NMPCSolver:
             
             # First order correction
             r = np.zeros((self.nx * (self.N), ))
+
             r[0: self.nx] = self.model.step_nonlinear_model(current_state, U_guess[0]) - X_guess[0]
             
             for k in range(self.N - 1):
@@ -268,8 +274,8 @@ class NMPCSolver:
             Aineq = sparse.eye((self.N) * self.nx + self.N * self.nu)
             A_states = sparse.vstack([Aeq, Aineq], format='csc')
 
-            lineq = np.hstack([-np.inf, -np.inf, -np.inf] * (self.N) + [-math.pi] * self.N)
-            uineq = np.hstack([np.inf, np.inf, np.inf] * (self.N) + [math.pi] * self.N)
+            lineq = np.hstack([-np.inf] * (self.N) * self.nx + [-np.inf] * self.N * self.nu)
+            uineq = np.hstack([np.inf] * (self.N) * self.nx + [np.inf] * self.N * self.nu)
             leq = - r
             ueq = - r
             l = np.hstack([leq, lineq])
@@ -286,7 +292,7 @@ class NMPCSolver:
             self.optimizer = osqp.OSQP()
             self.optimizer.setup(P=P, q=q, A=A_states, l=l, u=u, verbose=False)
             dec = self.optimizer.solve()
-            delta_U = np.array(dec.x[-self.N * self.nu:])
+            delta_U = np.reshape(dec.x[-self.N * self.nu:], (self.N, self.nu))
             delta_X = np.reshape(dec.x[:(self.N) * self.nx], (self.N, self.nx))
             
             # Update guesses
