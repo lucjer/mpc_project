@@ -9,7 +9,7 @@ model_params:
   
 # Linearization Parameters (Sample values, make up as needed)
 mpc_params:
-  dt: 0.2 # Discretization time step
+  dt: 0.4 # Discretization time step
   b: 0.2
   c: 0.3
   d: 0.4

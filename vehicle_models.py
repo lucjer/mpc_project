@@ -19,7 +19,7 @@ class MPCModel(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def linearization_model(self, state, input):
+    def linearization_model(self, state, input, reference_state, reference_input):
         """Linearized model. Returns linearization of discrete time model (A, B) at operating point (x, u)."""
         pass
 
@@ -130,7 +130,7 @@ class KinematicBicycleConstantSpeed(MPCModel):
     
     return state_dot
   
-  def linearization_model(self, state, input, debug=False):
+  def linearization_model(self, state, input, reference_state=None, reference_input=None, debug=False):
       """
       Linearizes the vehicle model around the given state and input.
       
@@ -267,7 +267,7 @@ class KinematicBicycleSpatialSpeed(MPCModel):
     return new_state
     
     
-  def linearize_model(self, model, state, input, debug=False):
+  def linearization_model(self, state, input, debug=False):
     
     l_front = self.model_params['l_f']
     l_rear = self.model_params['l_r']
@@ -327,11 +327,15 @@ class KinematicBicycleSpatialSpeed(MPCModel):
     
     return A, B, C, C
   
-  def output_model(self, state, input, theta_ref, x_ref, y_ref):
-     output = np.zeros((self.mpc_params['n_outputs'], 1))
+  def output_model(self, state, reference, inputs):
+     x_ref = reference[0]
+     y_ref = reference[1]
+     theta_ref = reference[2]
+     output = np.zeros((self.model_params['n_outputs'], 1))
      alpha = self.model_params['l_r'] / (self.model_params['l_f'] + self.model_params['l_r'])
-     delta = input[0]
+     delta = inputs[0]
      beta = np.arctan(alpha * np.tan(delta))
      output[0] = math.sin(theta_ref) * (state[0] - x_ref) - math.cos(theta_ref) * (state[1] - y_ref)
      output[1] = - math.cos(theta_ref) * (state[0] - x_ref) - math.sin(theta_ref) * (state[1] - y_ref)
-     output[2] =  input[1] * np.sin(beta) + (state[3]**2 / self.model_params['l_r']) * np.sin(beta) * np.cos(beta)
+     output[2] =  inputs[1] * np.sin(beta) + (state[3]**2 / self.model_params['l_r']) * np.sin(beta) * np.cos(beta)
+     return output
