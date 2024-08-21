@@ -250,6 +250,7 @@ def find_closest_index(current_state, total_reference):
     return np.argmin(distances)
 
 
+
 def find_start_index(current_state, n_horizon, total_reference, total_reference_input):
     start_index =  find_closest_index(current_state, total_reference)
     # Shift the index forward by one

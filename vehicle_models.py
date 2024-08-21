@@ -409,9 +409,8 @@ class KinematicBicycleVariableSpeed(MPCModel):
     def output_model(self, state, input):
         return state
 
-    def step_nonlinear_model(self, state, input, debug=False):
-        if debug:
-            return state
+    def step_nonlinear_model(self, state, inp, debug=False):
+
         new_state = np.zeros((4,))
         l_front = self.model_params["l_f"]
         l_rear = self.model_params["l_r"]
@@ -420,8 +419,8 @@ class KinematicBicycleVariableSpeed(MPCModel):
         y = state[1]
         theta = state[2]
         v = state[3]
-        delta = input[0]
-        a = input[1]
+        delta = inp[0]
+        a = inp[1]
 
         beta = np.arctan((l_rear / (l_front + l_rear)) * np.tan(delta))
         x_dot = v * math.cos(theta + beta)

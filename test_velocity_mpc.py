@@ -11,7 +11,7 @@ import utils
 
 # MPC CONTROLLER INITIALIZATION
 model_kin = vm.KinematicBicycleVariableSpeed('config_files/mpc_bicycle_velocity_config.yaml') 
-n_horizon = 30
+n_horizon = 50
 Q = sparse.diags([1, 1, 100, 1])
 R = sparse.diags([1, 100])
 QN = sparse.diags([.1, .1, .1, .1])
@@ -38,7 +38,7 @@ X_guesss, U_guesss = mpc_test_2.solve_sqp(current_state, X_ref, U_ref,
 
 
 # POPULATE REFERENCE TRAJECTORY
-x_ref = np.linspace(0,  10 * np.pi, 400)
+x_ref = np.linspace(0,  10 * np.pi, 400) * 2
 y_ref = (np.cos(0.2 * x_ref) * 6 + 2 * np.cos(0.25 * x_ref) * 2) * 2
 total_reference, total_reference_input = utils.compute_reference_velocity_test(model_kin.mpc_params['dt'], x_ref, y_ref)
 n_total_traj = len(total_reference)
@@ -57,7 +57,7 @@ while j < n_total_traj - n_horizon:
     j = utils.find_start_index(current_state, n_horizon, total_reference, total_reference_input)
     X = total_reference[j:j+n_horizon]
     U = total_reference_input[j:j+n_horizon]
-    if n_sim%30 == 1:
+    if n_sim%3000 == 1:
         X_guess, U_guess = mpc_test_2.solve_sqp(current_state, X, U, debug = True, sqp_iter=5, alpha=0.3)
         input()
     else:
