@@ -1,14 +1,11 @@
-import osqp as op
+# Test script for the MPC controller with variable speed
 import numpy as np
-import osqp as op
-import scipy as sp
 import matplotlib.pyplot as plt
-from tqdm import tqdm
+import matplotlib.animation as animation
 from scipy import sparse
-
 import vehicle_models as vm
 import mpc_controllers as mpc
-import utils as utils 
+import utils
 
 
 
@@ -42,7 +39,7 @@ X_guesss, U_guesss = mpc_test_2.solve_sqp(current_state, X_ref, U_ref,
 
 # POPULATE REFERENCE TRAJECTORY
 x_ref = np.linspace(0,  10 * np.pi, 400)
-y_ref = (np.cos(0.5 * x_ref) * 6 + 2 * np.cos(0.75 * x_ref) * 2) * 2
+y_ref = (np.cos(0.2 * x_ref) * 6 + 2 * np.cos(0.25 * x_ref) * 2) * 2
 total_reference, total_reference_input = utils.compute_reference_velocity_test(model_kin.mpc_params['dt'], x_ref, y_ref)
 n_total_traj = len(total_reference)
 
@@ -60,7 +57,7 @@ while j < n_total_traj - n_horizon:
     j = utils.find_start_index(current_state, n_horizon, total_reference, total_reference_input)
     X = total_reference[j:j+n_horizon]
     U = total_reference_input[j:j+n_horizon]
-    if n_sim%1000 == 1:
+    if n_sim%30 == 1:
         X_guess, U_guess = mpc_test_2.solve_sqp(current_state, X, U, debug = True, sqp_iter=5, alpha=0.3)
         input()
     else:
@@ -94,7 +91,6 @@ plt.savefig('test_velocity.pdf')
 
 
 
-import matplotlib.animation as animation
 
 # Final Plot
 x_traj = [state_history[i][0] for i in range(2, n_sim)]

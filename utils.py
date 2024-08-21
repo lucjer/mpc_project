@@ -168,6 +168,7 @@ class Spline2D:
 
 
 def calc_spline_course(x, y, ds=0.1):
+    # TODO: Add dependency with respect to the car wheelbase
     sp = Spline2D(x, y)
     s = list(np.arange(0, sp.s[-1], ds))
 
@@ -183,7 +184,6 @@ def calc_spline_course(x, y, ds=0.1):
         k = sp.calc_curvature(i_s)
         rk.append(k)
         rsteer.append(np.arctan(k))
-
     return rx, ry, ryaw, rk, rsteer, s
 
 
@@ -244,17 +244,16 @@ def plot_xref_evolution(X_ref_evolution, filename="xref_evolution.pdf"):
     plt.savefig(filename)
     plt.close()
 
-
+def find_closest_index(current_state, total_reference):
+    distances = np.sqrt((np.array([point[0] for point in total_reference]) - current_state[0])**2+ 
+                        (np.array([point[1] for point in total_reference]) - current_state[1])**2)
+    return np.argmin(distances)
 
 
 def find_start_index(current_state, n_horizon, total_reference, total_reference_input):
-    distances = np.sqrt((np.array([point[0] for point in total_reference]) - current_state[0])**2 + 
-                        (np.array([point[1] for point in total_reference]) - current_state[1])**2)
-    start_index = np.argmin(distances)
-    
+    start_index =  find_closest_index(current_state, total_reference)
     # Shift the index forward by one
     start_index = min(start_index + 1, len(total_reference) - n_horizon)
-    
     return start_index
 
 
