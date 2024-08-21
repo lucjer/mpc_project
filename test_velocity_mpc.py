@@ -11,7 +11,7 @@ import utils
 
 # MPC CONTROLLER INITIALIZATION
 model_kin = vm.KinematicBicycleVariableSpeed('config_files/mpc_bicycle_velocity_config.yaml') 
-n_horizon = 50
+n_horizon = 25
 Q = sparse.diags([1, 1, 100, 1])
 R = sparse.diags([1, 100])
 QN = sparse.diags([.1, .1, .1, .1])
@@ -51,13 +51,14 @@ input_history = []
 initial_index = utils.find_start_index(current_state, n_horizon, total_reference, total_reference_input)
 j = initial_index
 n_sim = 0 
+print(n_total_traj)
 
 while j < n_total_traj - n_horizon:
     n_sim += 1
     j = utils.find_start_index(current_state, n_horizon, total_reference, total_reference_input)
     X = total_reference[j:j+n_horizon]
     U = total_reference_input[j:j+n_horizon]
-    if n_sim%3000 == 1:
+    if n_sim%400 == 1:
         X_guess, U_guess = mpc_test_2.solve_sqp(current_state, X, U, debug = True, sqp_iter=5, alpha=0.3)
         input()
     else:

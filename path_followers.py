@@ -24,28 +24,30 @@ class PathFollowerVariableSpeed:
         self.mpc_controller = mpc_controller # MPC controller for the vehicle 
         self.velocity_resolution = 0.5 # Resolution of the velocity profile
         self.ds_resolution = self.velocity_resolution * self.mpc_controller.model.mpc_params['dt'] # Distance between points on the path for the velocity profile
-        self.trajectory = {'x': [], 'y': [], 'yaw': [], 'v': [], 'inp': []} # Trajectory of the vehicle
+        self.trajectory = {'x': [], 'y': [], 'yaw': [], 'v': [], 'inp': [], 'k':[]} # Trajectory of the vehicle
         
     def fetch_reference(self, current_state):
         # Find the index of the closest point on the path
-        self.current_index = utils.find_closest_index(current_state, self.trajectory)
+        self.current_index = self.find_closest_index(current_state, self.trajectory)
         # Find the index of the next point on the path
         X = []
         U = []
+        fetching_index = self.current_index + int(self.trajectory['v'][self.current_index] // self.velocity_resolution)
         for _ in range(self.mpc_controller.N):
-            step = int(self.trajectory['v'][self.current_index] // self.velocity_resolution)
-
-            reference_state = np.array([self.trajectory['x'][self.current_index + step],
-                                        self.trajectory['y'][self.current_index + step],
-                                        self.trajectory['yaw'][self.current_index + step],
-                                        self.trajectory['v'][self.current_index + step]])
+            step = int(self.trajectory['v'][fetching_index] // self.velocity_resolution)
+            reference_state = np.array([self.trajectory['x'][fetching_index + step],
+                                        self.trajectory['y'][fetching_index + step],
+                                        self.trajectory['yaw'][fetching_index + step],
+                                        self.trajectory['v'][fetching_index + step]])
+            fetching_index += step
+            #print(reference_state)
             X.append(reference_state)
             U.append(self.trajectory['inp'][self.current_index + step])
         return X, U
     
     def compute_optimal_input(self, current_state, debug = False):
         X, U = self.fetch_reference(current_state)
-        X_guess, U_guess = self.mpc_controller.solve_sqp(current_state, X, U, debug = debug, sqp_iter=15, alpha=0.1)
+        X_guess, U_guess = self.mpc_controller.solve_sqp(current_state, X, U, debug = debug, sqp_iter=20, alpha=0.1)
         return U_guess[0]
     
     
@@ -57,32 +59,33 @@ class PathFollowerVariableSpeed:
             self.trajectory['yaw'].append(ryaw_i)
             # TODO: Naive implementation of velocity profile
             a_max = 9.8
-            max_velocity = 9.8
-            ref_velocity = min(a_max /np.abs(np.abs(rk_i)*2+0.05), max_velocity)
+            max_velocity = 12
+            ref_velocity = min(a_max /np.abs(rk_i**2*2+0.01), max_velocity)
             self.trajectory['v'].append(ref_velocity)
             self.trajectory['inp'].append([rsteer_i, 0])
+            self.trajectory['k'].append(rk_i**2)
             
         # Smoothen the yaw and v vectors
-        alpha = 0.1  # Smoothing factor
+        alpha = 0.15  # Smoothing factor
         self.trajectory['yaw'] = exponential_moving_average(self.trajectory['yaw'], alpha)
         self.trajectory['v'] = exponential_moving_average(self.trajectory['v'], alpha)
+        plt.plot(self.trajectory['v'])
+        plt.savefig('velocity_profile.pdf')
+        input()
     
     @staticmethod
     def find_closest_index(current_state, trajectory):
-        print("Trajectory")
-        print(trajectory['x'][0])
-        input()
         distances = np.sqrt((np.array([x for x in trajectory['x']]) - current_state[0])**2+ 
                             (np.array([y for y in trajectory['y']]) - current_state[1])**2)
         return np.argmin(distances)
     
     
-x_ref = np.linspace(0,  10 * np.pi, 400) * 2
-y_ref = (np.cos(0.2 * x_ref) * 6 + 2 * np.cos(0.25 * x_ref) * 2) * 2
+x_ref = np.linspace(0, 30 * np.pi, 800) 
+y_ref = np.cos(0.3 * x_ref) * 8
 model_kin = vm.KinematicBicycleVariableSpeed('config_files/mpc_bicycle_velocity_config.yaml') 
-n_horizon = 20
-Q = sparse.diags([10, 10, 200, 15])
-R = sparse.diags([1, 20])
+n_horizon = 50
+Q = sparse.diags([40, 40, 120, 100])
+R = sparse.diags([1, 2])
 QN = sparse.diags([.1, .1, .1, .1])
 # TODO: Implementation of input and state constraints handling
 InputConstraints = {'umin': np.array([-np.inf, -np.inf]), 
@@ -99,23 +102,25 @@ path_follower.populate_trajectory()
 
 
 # INITIALIZE SIMULATION
-current_state = np.array([0, 20, 0., 7])
+current_state = np.array([-0.3, 6, 0., 7])
 state_history = [current_state]
 input_history = []
 path_follower.compute_optimal_input(current_state)
 
 
 j = path_follower.find_closest_index(current_state, path_follower.trajectory)
+
 n_sim = 0
+debug = False
 
 while n_sim <200:
     debug = False
     if n_sim % 50 == 0:
         debug = True
-        print(n_sim)
+    optimal_input = path_follower.compute_optimal_input(current_state, debug = debug)
+    if debug:
         input()
-    optimal_input = path_follower.compute_optimal_input(current_state, debug = False)
-    current_state = model_kin.step_nonlinear_model(current_state, optimal_input).reshape(model_kin.n_states, 1)
+    current_state = model_kin.step_nonlinear_model(current_state, optimal_input)
     input_history.append(optimal_input)
     state_history.append(current_state)
     n_sim += 1
@@ -163,7 +168,7 @@ ani = animation.FuncAnimation(fig, update, frames=n_sim, init_func=init, blit=Tr
 plt.legend()
 
 # Save the animation
-ani.save('trajectory_animation.gif', writer='imagemagick')
+#ani.save('trajectory_animation.gif', writer='imagemagick')
 
 
 plt.figure()

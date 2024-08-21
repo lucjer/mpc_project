@@ -64,6 +64,7 @@ while j < n_total_traj - n_horizon:
     else:
         X_guess, U_guess = mpc_test_2.solve_sqp(current_state, X, U, debug = False, sqp_iter=7, alpha=0.25)
 
+
     opt_input = U_guess[0]
     current_state = model_kin.step_nonlinear_model(current_state, [opt_input]).reshape(model_kin.n_states, 1)
     input_history.append(opt_input[0])
