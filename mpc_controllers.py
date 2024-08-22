@@ -59,7 +59,7 @@ class NMPCSolverOutput():
         self.N = N # Prediction Horizon
         self.Q = Q  # State cost
         self.R = R  # Input cost
-        self.QN = QN # Final state cost
+        self.QN = QN # Final state cost        
         
         # Model and Dimensions
         self.model = model
@@ -94,7 +94,7 @@ class NMPCSolverOutput():
         cost_evolution = []
 
         # Iterate over horizon
-        for j in range(sqp_iter):
+        for _ in range(sqp_iter):
             # LTV System Matrices
             A_states = np.zeros((self.nx * (self.N), self.nx * (self.N)))
             B_states = np.zeros((self.nx * (self.N), self.nu * (self.N)))

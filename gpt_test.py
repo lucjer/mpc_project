@@ -1,9 +1,12 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import animation
 from scipy import sparse
 import vehicle_models as vm
 import mpc_controllers as mpc
 import utils
+import os
+
 
 # Exponential Moving Average Function
 def exponential_moving_average(data, alpha):
@@ -43,10 +46,10 @@ class PathFollowerVariableSpeed:
             U.append(self.trajectory['inp'][self.current_index + step])
         return X, U
     
-    def compute_optimal_input(self, current_state, debug = False):
+    def compute_optimal_input(self, current_state, debug=False):
         X, U = self.fetch_reference(current_state)
-        X_guess, U_guess = self.mpc_controller.solve_sqp(current_state, X, U, debug = debug, sqp_iter=6, alpha=0.08)
-        return U_guess[0]
+        X_guess, U_guess = self.mpc_controller.solve_sqp(current_state, X, U, debug=debug, sqp_iter=10, alpha=0.09)
+        return U_guess  # Return the entire sequence of predicted inputs
     
     def populate_trajectory(self):
         rx, ry, ryaw, rk, rsteer, s = utils.calc_spline_course(self.path['x'], self.path['y'], ds=self.ds_resolution)
@@ -54,72 +57,158 @@ class PathFollowerVariableSpeed:
             self.trajectory['x'].append(rx_i)
             self.trajectory['y'].append(ry_i)
             self.trajectory['yaw'].append(ryaw_i)
-            a_max = 9.8
+            a_max = 6
             max_velocity = 6
-            ref_velocity = min(a_max /np.abs(rk_i**2*12+0.01), max_velocity)
+            ref_velocity = min(a_max /np.abs(rk_i**2*3+1/6.), max_velocity)
             self.trajectory['v'].append(ref_velocity)
             self.trajectory['inp'].append([rsteer_i, 0])
             self.trajectory['k'].append(rk_i**2)
             
-        alpha = 0.005  # Smoothing factor
+        alpha = 0.0009  # Smoothing factor
         self.trajectory['yaw'] = exponential_moving_average(self.trajectory['yaw'], 0.99)
         self.trajectory['v'] = exponential_moving_average(self.trajectory['v'], alpha)
         plt.plot(self.trajectory['v'])
         plt.savefig('velocity_profile.pdf')
-        plt.show()
-    
+        input()
+            
     @staticmethod
     def find_closest_index(current_state, trajectory):
         distances = np.sqrt((np.array([x for x in trajectory['x']]) - current_state[0])**2+ 
                             (np.array([y for y in trajectory['y']]) - current_state[1])**2)
         return np.argmin(distances)
-    
-    
-x_ref = np.linspace(0, 30 * np.pi, 800) 
-y_ref = np.cos(0.3 * x_ref) * 6
+
+    import os
+
+    def plot_fetched_trajectory_and_input(self, current_state, optimal_input, n_sim, save_dir='debug_plots'):
+        """Plot the fetched reference trajectory and compare the reference input with the optimal input."""
+        X_ref, U_ref = self.fetch_reference(current_state)
+
+        ref_x = [state[0] for state in X_ref]
+        ref_y = [state[1] for state in X_ref]
+        ref_yaw = [state[2] for state in X_ref]
+        ref_v = [state[3] for state in X_ref]
+        ref_steer = [inp[0] for inp in U_ref]
+        ref_acc = [inp[1] for inp in U_ref]
+
+        optimal_steer = [inp[0] for inp in optimal_input]
+        optimal_acc = [inp[1] for inp in optimal_input]
+
+        fig, axs = plt.subplots(3, 2, figsize=(15, 12))
+
+        # Plot the fetched reference trajectory (Position)
+        axs[0, 0].plot(ref_x, ref_y, 'go-', label='Fetched Reference')
+        axs[0, 0].scatter(current_state[0], current_state[1], color='red', label='Current State')
+        axs[0, 0].set_title(f"Step {n_sim}: Current Position and Fetched Reference")
+        axs[0, 0].set_xlabel("X")
+        axs[0, 0].set_ylabel("Y")
+        axs[0, 0].legend()
+        axs[0, 0].axis('equal')
+
+        # Plot the yaw angle in the fetched reference
+        axs[0, 1].plot(ref_yaw, 'm*-', label='Yaw')
+        axs[0, 1].set_title("Yaw Angle in Fetched Reference")
+        axs[0, 1].set_xlabel("Step")
+        axs[0, 1].set_ylabel("Yaw [rad]")
+        axs[0, 1].legend()
+
+        # Plot the velocity profile in the fetched reference
+        axs[1, 0].plot(ref_v, 'b*-', label='Velocity')
+        axs[1, 0].set_title("Velocity Profile in Fetched Reference")
+        axs[1, 0].set_xlabel("Step")
+        axs[1, 0].set_ylabel("Velocity [m/s]")
+        axs[1, 0].legend()
+
+        # Plot the steering input comparison
+        axs[1, 1].plot(ref_steer, 'bo-', label='Reference Steering')
+        axs[1, 1].plot(optimal_steer, 'ro-', label='Optimal Steering')
+        axs[1, 1].set_title("Steering Input Comparison")
+        axs[1, 1].set_xlabel("Horizon Step")
+        axs[1, 1].set_ylabel("Steering [rad]")
+        axs[1, 1].legend()
+
+        # Plot the acceleration input comparison
+        axs[2, 0].plot(ref_acc, 'bo-', label='Reference Acceleration')
+        axs[2, 0].plot(optimal_acc, 'ro-', label='Optimal Acceleration')
+        axs[2, 0].set_title("Acceleration Input Comparison")
+        axs[2, 0].set_xlabel("Horizon Step")
+        axs[2, 0].set_ylabel("Acceleration [m/s^2]")
+        axs[2, 0].legend()
+
+        # Hide the empty subplot (2nd column in the 3rd row)
+        axs[2, 1].axis('off')
+
+        plt.tight_layout()
+
+        # Ensure the directory exists
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+
+        # Save the figure
+        plt.savefig(f'{save_dir}/fetched_trajectory_and_input_step_{n_sim}.pdf')
+        plt.close()
+
+
+# Initialization of the PathFollower and the MPC Controller
+x_ref = np.linspace(0, 60 * np.pi, 800) 
+y_ref = np.cos(x_ref/10 * np.pi ) * 9
 model_kin = vm.KinematicBicycleVariableSpeed('config_files/mpc_bicycle_velocity_config.yaml') 
-n_horizon = 30
-Q = sparse.diags([12, 12, 30, 20])
-R = sparse.diags([2, 9])
+n_horizon = 45
+Q = sparse.diags([12, 12, 30, 90])
+R = sparse.diags([8, 1])
 QN = sparse.diags([.1, .1, .1, .1])
-# TODO: Implementation of input and state constraints handling
+
 InputConstraints = {'umin': np.array([-np.inf, -np.inf]), 
                     'umax': np.array([np.inf, np.inf])}
 StateConstraints = {'xmin': np.array([-np.inf, -np.inf, -np.inf, -np.inf]),
                     'xmax': np.array([np.inf, np.inf, np.inf, np.inf])}
-mpc_controller = mpc.NMPCSolver(model=model_kin, N=n_horizon, Q = Q, R=R, QN=Q,
+mpc_controller = mpc.NMPCSolver(model=model_kin, N=n_horizon, Q=Q, R=R, QN=Q,
                              StateConstraints=StateConstraints,
                              InputConstraints=InputConstraints,
-                             alpha = 0.5) 
+                             alpha=0.5) 
 
-path_follower = PathFollowerVariableSpeed({'x': x_ref, 'y': y_ref}, 0.5, mpc_controller, 0.1)
+path_follower = PathFollowerVariableSpeed({'x': x_ref, 'y': y_ref}, 0.05, mpc_controller, 0.05)
 path_follower.populate_trajectory()
 
-
 # INITIALIZE SIMULATION
-current_state = np.array([1., -6, 0., 6])
+current_state = np.array([0.,0., 0., 6])
 state_history = [current_state]
 input_history = []
 path_follower.compute_optimal_input(current_state)
-
 
 j = path_follower.find_closest_index(current_state, path_follower.trajectory)
 
 n_sim = 0
 debug = False
 
-while n_sim <200:
+
+# Initialize lists to store velocities
+vehicle_velocities = []
+reference_velocities = []
+
+while n_sim < 400:
     debug = False
     if n_sim % 50 == 0:
         debug = True
-    optimal_input = path_follower.compute_optimal_input(current_state, debug = debug)
-    if debug:
-        input()
-    current_state = model_kin.step_nonlinear_model(current_state, optimal_input)
+        
+    optimal_input = path_follower.compute_optimal_input(current_state, debug=False)
+    current_state = model_kin.step_nonlinear_model(current_state, optimal_input[0])  
     input_history.append(optimal_input)
     state_history.append(current_state)
-    n_sim += 1
+    
+    vehicle_velocities.append(current_state[3])
 
+    # Find the closest index on the reference trajectory
+    closest_index = path_follower.find_closest_index(current_state, path_follower.trajectory)
+
+    # Record the reference velocity at the closest point
+    reference_velocities.append(path_follower.trajectory['v'][closest_index])
+    
+    # Plot fetched trajectory and input comparison
+    if debug:
+        path_follower.plot_fetched_trajectory_and_input(current_state, optimal_input, n_sim)
+        input()
+    
+    n_sim += 1
 
 x_traj = [state_history[i][0] for i in range(n_sim)]
 y_traj = [state_history[i][1] for i in range(n_sim)]
@@ -127,16 +216,15 @@ theta_traj = [state_history[i][2] for i in range(n_sim)]
 v_traj = [state_history[i][3] for i in range(n_sim)]
 
 plt.figure()
-plt.plot(x_ref, y_ref, color='blue', label = 'reference')
-plt.plot(x_traj[1:], y_traj[1:], color='orange', label = 'traj')
+plt.plot(x_ref, y_ref, color='blue', label='reference')
+plt.plot(x_traj[1:], y_traj[1:], color='orange', label='traj')
 plt.legend()
 plt.savefig('test.pdf')
 plt.show()
 
 plt.figure()
 plt.plot(v_traj[1:])
-plt.savefig('test_velocity.pdf')
-
+plt.savefig('test_velocity_new.pdf')
 
 # Final Plot
 x_traj = [state_history[i][0] for i in range(2, n_sim)]
@@ -144,8 +232,7 @@ y_traj = [state_history[i][1] for i in range(2, n_sim)]
 theta_traj = [state_history[i][2] for i in range(2, n_sim)]
 
 fig, ax = plt.subplots()
-ax.plot(x_ref, y_ref, color='blue', label='reference')
-ax.axis('equal')
+ax.plot(x_ref[:n_sim], y_ref[:n_sim], color='blue', label='reference')
 line, = ax.plot([], [], color='orange', label='trajectory')
 
 def init():
@@ -162,6 +249,19 @@ plt.legend()
 
 # Save the animation
 ani.save('trajectory_animation.gif', writer='imagemagick')
+
+
+plt.figure(figsize=(10, 6))
+plt.plot(vehicle_velocities, label='Vehicle Velocity', color='blue')
+plt.plot(reference_velocities, label='Reference Velocity', color='green', linestyle='--')
+plt.title("Vehicle Velocity vs Reference Velocity")
+plt.xlabel("Simulation Step")
+plt.ylabel("Velocity [m/s]")
+plt.legend()
+plt.grid(True)
+plt.savefig('velocity_comparison.pdf')
+plt.show()
+
 
 
 plt.figure()
