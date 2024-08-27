@@ -348,7 +348,7 @@ class KinematicBicycleVariableSpeed(MPCModel):
         state_dot[3] = v_dot
 
         return state_dot
-
+    
     def linearization_model(
         self, state, inputs, reference_state=None, reference_input=None, debug=False
     ):
@@ -408,7 +408,7 @@ class KinematicBicycleVariableSpeed(MPCModel):
 
     def output_model(self, state, input):
         return state
-
+    
     def step_nonlinear_model(self, state, inp, debug=False):
 
         new_state = np.zeros((4,))
