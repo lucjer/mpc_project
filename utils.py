@@ -209,7 +209,7 @@ def compute_reference_velocity_test(dt, x_ref, y_ref, v = 1):
 
 
 
-def plot_xref_evolution(X_ref_evolution, filename="xref_evolution.pdf"):
+def plot_xref_evolution(results, folder_path):
     """
     Plots the evolution of X_ref over the iterations of the SQP algorithm,
     including yaw angles on the trajectories.
@@ -218,6 +218,7 @@ def plot_xref_evolution(X_ref_evolution, filename="xref_evolution.pdf"):
         X_ref_evolution (list of lists): A list containing X_ref at each iteration.
         filename (str): The filename where the plot will be saved.
     """
+    X_ref_evolution = results['X_guess_evolution']
     N = len(X_ref_evolution)
     
     plt.figure(figsize=(10, 5))
@@ -241,7 +242,7 @@ def plot_xref_evolution(X_ref_evolution, filename="xref_evolution.pdf"):
     plt.tight_layout()
     
     # Save the plot as a PDF file
-    plt.savefig(filename)
+    plt.savefig(folder_path + 'xref_evolution.pdf')
     plt.close()
 
 def find_closest_index(current_state, total_reference):

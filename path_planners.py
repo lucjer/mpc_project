@@ -61,7 +61,7 @@ class PathFollowerVariableSpeed:
     
     def compute_optimal_input(self, current_state, debug=False):
         X, U = self.fetch_reference(current_state)
-        X_guess, U_guess = self.mpc_controller.profile_solve_sqp(current_state, X, U, debug=debug, sqp_iter=8, alpha=0.1)
+        X_guess, U_guess = self.mpc_controller.profile_solve_sqp(current_state, X, U, debug=debug, sqp_iter=3, alpha=0.1)
         return U_guess  
     
     def populate_trajectory(self):
@@ -81,7 +81,7 @@ class PathFollowerVariableSpeed:
         self.trajectory['yaw'] = exponential_moving_average(self.trajectory['yaw'], 0.99)
         self.trajectory['v'] = apply_gaussian_filter(self.trajectory['v'], sigma=2800)
         plt.plot(self.trajectory['v'])
-        plt.savefig('velocity_profile.pdf')
+        plt.savefig('simulation_results/velocity_profile.pdf')
         input()
             
     @staticmethod
@@ -162,14 +162,13 @@ class PathFollowerVariableSpeed:
 
 # Initialization of the PathFollower and the MPC Controller
 x_ref = np.linspace(0, 120 * np.pi, 1200)
-y_ref = np.sin(x_ref/40 * np.pi ) * 30
+y_ref = np.sin(x_ref/40 * np.pi ) * 30 - np.sin(x_ref/20 * np.pi ) * 10
 current_state = np.array([0., 5., np.pi/4, 10.0])
 
 model_kin = vm.KinematicBicycleVariableSpeed('config_files/mpc_bicycle_velocity_config.yaml') 
-n_horizon = 50
+n_horizon = 25
 Q = sparse.diags([50, 50, 65, 60])
 R = sparse.diags([5, 1])
-QN = sparse.diags([.1, .1, .1, .1])
 
 
 u_min_acc = -3
@@ -182,10 +181,11 @@ InputConstraints = {'umin': [delta_min, u_min_acc],
 
 StateConstraints = {'xmin': np.array([-np.inf, -np.inf, -np.inf, -np.inf]),
                     'xmax': np.array([np.inf, np.inf, np.inf, np.inf])}
-mpc_controller = mpc.NMPCSolver(model=model_kin, N=n_horizon, Q=Q, R=R, QN=Q,
+mpc_controller = mpc.NMPCSolver(model=model_kin, N=n_horizon, Q=Q, R=R,
                              StateConstraints=StateConstraints,
                              InputConstraints=InputConstraints,
-                             alpha=0.5) 
+                             debug_plotting_callback=utils.plot_xref_evolution,
+                             debug_plots_folder='debug_plots/') 
 
 path_follower = PathFollowerVariableSpeed({'x': x_ref, 'y': y_ref}, 0.05, mpc_controller, 0.05)
 path_follower.populate_trajectory()
@@ -206,7 +206,7 @@ vehicle_velocities = []
 reference_velocities = []
 reference_curvatures = []
 
-while n_sim < 200:
+while n_sim < 25:
     debug = False
     if n_sim % 50 == 0:
         debug = True
@@ -242,35 +242,13 @@ y_traj = [state_history[i][1] for i in range(n_sim)]
 theta_traj = [state_history[i][2] for i in range(n_sim)]
 v_traj = [state_history[i][3] for i in range(n_sim)]
 
-plt.figure()
-plt.plot(x_ref, y_ref, color='blue', label='reference')
-plt.plot(x_traj[1:], y_traj[1:], color='orange', label='traj')
-plt.legend()
-plt.savefig('test.pdf')
-plt.show()
-
-plt.figure()
-plt.plot(v_traj[1:])
-plt.savefig('test_velocity_new.pdf')
 
 # Final Plot
 x_traj = [state_history[i][0] for i in range(2, n_sim)]
 y_traj = [state_history[i][1] for i in range(2, n_sim)]
 theta_traj = [state_history[i][2] for i in range(2, n_sim)]
 
-fig, ax = plt.subplots()
-ax.plot(x_ref[:n_sim], y_ref[:n_sim], color='blue', label='reference')
-line, = ax.plot([], [], color='orange', label='trajectory')
 
-def init():
-    line.set_data([], [])
-    return line,
-
-def update(frame):
-    line.set_data(x_traj[:frame], y_traj[:frame])
-    return line,
-
-ani = animation.FuncAnimation(fig, update, frames=n_sim, init_func=init, blit=True)
 
 plt.legend()
 
@@ -285,7 +263,7 @@ plt.xlabel("Simulation Step")
 plt.ylabel("Velocity [m/s]")
 plt.legend()
 plt.grid(True)
-plt.savefig('velocity_comparison.pdf')
+plt.savefig('simulation_results/velocity_comparison.pdf')
 plt.show()
 
 
@@ -302,11 +280,27 @@ plt.subplot(2, 1, 2)
 plt.plot(acc_input, label='Acceleration Input', color='green')
 plt.plot([u_min_acc]*len(input_history), label='Minimum Accel', color='red', linestyle='dashdot')
 plt.plot([u_max_acc]*len(input_history), label='Maximum Accel', color='red', linestyle='--')
-plt.savefig('input_comparison.pdf')
+plt.savefig('simulation_results/input_comparison.pdf')
 plt.legend()
 plt.show()
 
-ani.save('trajectory_animation.gif', writer='imagemagick')
+
+
+
+fig, ax = plt.subplots()
+ax.plot(x_ref[:n_sim], y_ref[:n_sim], color='blue', label='reference')
+line, = ax.plot([], [], color='orange', label='trajectory')
+
+def init():
+    line.set_data([], [])
+    return line,
+
+def update(frame):
+    line.set_data(x_traj[:frame], y_traj[:frame])
+    return line,
+
+ani = animation.FuncAnimation(fig, update, frames=n_sim, init_func=init, blit=True)
+ani.save('simulation_results/trajectory_animation.gif', writer='imagemagick')
 
 
 
