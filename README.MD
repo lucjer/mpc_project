@@ -22,16 +22,8 @@ The implementation of the NMPCSolver class draws inspiration from the [MPC class
 
 Given the state estimate $\hat{x}_i$ and reference trajectories $\boldsymbol{x}_i^{\text{ref}}$ and $\boldsymbol{u}_i^{\text{ref}}$, the optimization problem is:
 
-$$\operatorname{NLP}\left(\hat{x}_i, \boldsymbol{x}_i^{\text{ref}}, \boldsymbol{u}_i^{\text{ref}}\right) = \arg \min_{x, u} \sum_{k=0}^{N-1} \frac{1}{2}
-\begin{bmatrix}
-x_{i, k} - x_{i, k}^{\text{ref}} \\
-u_{i, k} - u_{i, k}^{\text{ref}}
-\end{bmatrix}^\top
-W_{i, k}
-\begin{bmatrix}
-x_{i, k} - x_{i, k}^{\text{ref}} \\
-u_{i, k} - u_{i, k}^{\text{ref}}
-\end{bmatrix}$$
+
+![plot](./readme_imgs/NLP_general.png)
 
 Subject to:
 
@@ -44,39 +36,17 @@ In the SQP approach, the optimization problem is iteratively approximated by qua
 
 
 At a guess $\left(\boldsymbol{x}_i^{\text {guess }}, \boldsymbol{u}_i^{\text {guess }}\right)$, Problem (9) is approximated by the QP:
-$$
-\begin{array}{r}
-\mathrm{QP}_{\mathrm{NMPC}}\left(\hat{x}_i, \boldsymbol{x}_i^{\text {guess }}, \boldsymbol{u}_i^{\text {guess }}, \boldsymbol{x}_i^{\text {ref }}, \boldsymbol{u}_i^{\text {ref }}\right)= \\
-\arg \min _{\Delta x_i, \Delta u_i} \sum_{k=0}^{N-1} \frac{1}{2}\left[\begin{array}{c}
-\Delta x_{i, k} \\
-\Delta u_{i, k}
-\end{array}\right] H_{i, k}\left[\begin{array}{c}
-\Delta x_{i, k} \\
-\Delta u_{i, k}
-\end{array}\right]+J_{i, k}^T\left[\begin{array}{c}
-\Delta x_{i, k} \\
-\Delta u_{i, k}
-\end{array}\right] \\
-\text { s. t. } \Delta x_{i, 0}=\hat{x}_i-x_{i, 0}^{\text {guess }}, \\
-\Delta x_{i, k+1}=A_{i, k} \Delta x_{i, k}+B_{i, k} \Delta u_{i, k}+r_{i, k}, \\
-C_{i, k} \Delta x_{i, k}+D_{i, k} \Delta u_{i, k}+h_{i, k} \leq 0,
-\end{array}
-$$
+
+![plot](./readme_imgs/QP.png)
+
+![plot](./readme_imgs/subject.png)
+
+
 with 
-$$
-\begin{aligned}
-& A_{i, k}=\left.\frac{\partial f(x, u)}{\partial x}\right|_{x_{i, k}^{\text {guess }}, u_{i, k}^{\text {guess }}}, \\
-& B_{i, k}=\left.\frac{\partial f(x, u)}{\partial u}\right|_{x_{i, k} \text { guess }, u_{i, k}^{\text {guess }}}, \\
-& C_{i, k}=\left.\frac{\partial h(x, u)}{\partial x}\right|_{x_{i, k}^{\text {guess }}, u_{i, k}^{\text {guess }}}, \\
-& D_{i, k}=\left.\frac{\partial h(x, u)}{\partial u}\right|_{x_{i, k} \text { guess }, u_{i, k}^{\text {guess }}}, \\
-& r_{i, k}=f\left(x_{i, k}^{\text {guess }}, u_{i, k}^{\text {guess }}\right)-x_{i, k+1}^{\text {guess }}, h_{i, k}=h\left(x_{i, k}^{\text {guess }}, u_{i, k}^{\text {guess }}\right), \\
-& J_{i, k}=W_{i, k}\left[\begin{array}{l}
-x_{i k}^{\text {guess }}-x_{i, k}^{\text {ref }} \\
-u_{i, k}^{\text {guess }}-u_{i, k}^{\text {ref }}
-\end{array}\right], \\
-&
-\end{aligned}
-$$
+
+
+![plot](./readme_imgs/linearizations.png)
+
 
 ### Algorithm 1: SQP for NMPC at Discrete Time $i$
 
