@@ -82,7 +82,7 @@ class NMPCSolver:
 
         # Current state and control
         self.current_prediction = None
-        self.current_control = np.zeros((self.nu * self.N))
+        self.current_control = None
         
         # Initialize the optimizer
         self.optimizer = osqp.OSQP()
@@ -100,6 +100,19 @@ class NMPCSolver:
 
         return result
     
+    def compute_input_constraints(self, U_ref):
+        """
+        Compute the input constraints for the optimization problem
+        :param U_guess: current control guess
+        :return: input constraints
+        """
+        U_ref = U_ref
+        u_min = self.input_constraints['umin'] 
+        u_max = self.input_constraints['umax']
+        u_min_array = np.tile(u_min, self.N) + np.array(U_ref).reshape(self.N * self.nu, )
+        u_max_array = np.tile(u_max, self.N) + np.array(U_ref).reshape(self.N * self.nu, )
+        return u_min_array, u_max_array
+    
     @timer_decorator
     def solve_sqp(self, current_state, X_ref, U_ref, X_guess=None, U_guess=None, debug=False, sqp_iter=1, alpha=1.0):
         """
@@ -107,12 +120,19 @@ class NMPCSolver:
         :param X: current reference state
         :param U: current control
         """
-        if X_guess is None or U_guess is None:
-            X_guess = X_ref.copy()
-            U_guess = U_ref.copy()
-        else:
-            X_guess = X_guess.copy()
-            U_guess = U_guess.copy()
+        # Initialize guess for the optimization problem - SQP
+        if X_guess is None or U_guess is None: # If no guess is provided
+            if self.current_control is not None and self.current_prediction is not None:
+                U_guess = np.zeros_like(self.current_control)
+                X_guess = np.zeros_like(self.current_prediction)
+                U_guess[0:-1] = self.current_control[1:]
+                U_guess[-1] = self.current_control[-1] 
+                X_guess[0:-1] = self.current_prediction[1:]
+                X_guess[-1] = self.current_prediction[-1]
+            else:
+                X_guess = X_ref.copy()
+                U_guess = U_ref.copy()
+        
 
         X_guess_evolution = [X_guess.copy()]
         U_guess_evolution = [U_guess.copy()]
@@ -120,16 +140,20 @@ class NMPCSolver:
 
         # Initialize matrices that do not change
         I_Nx = sparse.eye(self.N * self.nx, format='csc')
-        I_nx = sparse.eye(self.nx, format='csc')
         P_Q = sparse.kron(sparse.eye(self.N, format='csc'), self.Q, format='csc')
         P_R = sparse.kron(sparse.eye(self.N, format='csc'), self.R, format='csc')
-        P = block_diag([P_Q, P_R], format='csc')
+        P = sparse.block_diag([P_Q, P_R], format='csc')
+
+        # Initialize matrices that change
+        A_states = np.zeros((self.nx * self.N, self.nx * self.N))
+        B_states = np.zeros((self.nx * self.N, self.nu * self.N))
+
+        # Use a more efficient sparse format for matrix construction
+        Aeq = sparse.lil_matrix((self.nx * self.N, self.nx * self.N + self.nu * self.N))
 
         # Iterate over horizon
         for j in range(sqp_iter):
-            # Initialize matrices that change
-            A_states = np.zeros((self.nx * self.N, self.nx * self.N))
-            B_states = np.zeros((self.nx * self.N, self.nu * self.N))
+
             r = np.zeros(self.nx * self.N)
 
             # First order correction
@@ -147,15 +171,22 @@ class NMPCSolver:
                 r[(k + 1) * self.nx: (k + 2) * self.nx] = self.model.step_nonlinear_model(state_guess_k, input_guess_k) - X_guess[k+1]
 
             # Compute Aeq and Aineq
-            Ax = -I_Nx + csc_matrix(A_states)
+            Ax = -I_Nx + sparse.csc_matrix(A_states)
             Bu = sparse.csc_matrix(B_states)
-            Aeq = sparse.hstack([Ax, Bu])
-            Aineq = sparse.eye(self.N * self.nx + self.N * self.nu)
+            
+            # Directly assign to preallocated Aeq
+            Aeq[:, :self.nx * self.N] = Ax
+            Aeq[:, self.nx * self.N:] = Bu
+            Aeq = Aeq.tocsc()
+
+            # Construct Aineq and the full constraint matrix
+            Aineq = sparse.eye(self.N * self.nx + self.N * self.nu, format='csc')
             A_states_full = sparse.vstack([Aeq, Aineq], format='csc')
 
             # Constraints
-            lineq = np.hstack([-np.inf] * self.N * self.nx + [-np.inf] * self.N * self.nu)
-            uineq = np.hstack([np.inf] * self.N * self.nx + [np.inf] * self.N * self.nu)
+            u_min, u_max = self.compute_input_constraints(-U_guess)
+            lineq = np.hstack([-np.inf] * self.N * self.nx + list(u_min))
+            uineq = np.hstack([np.inf] * self.N * self.nx + list(u_max))
             leq = -r
             ueq = -r
             l = np.hstack([leq, lineq])
@@ -181,14 +212,14 @@ class NMPCSolver:
             if debug:
                 X_guess_evolution.append(X_guess.copy())
                 U_guess_evolution.append(U_guess.copy())
-                #cost_evolution.append(self.compute_cost(delta_X, delta_U))
 
         if debug:
             utils.plot_xref_evolution(X_guess_evolution, filename="evolution_sqp.pdf")
-            # TODO: Implement cost evolution - to check convergence
-            # utils.plot_cost_evolution(cost_evolution, filename="cost_evolution_sqp.pdf")
-
+            print("SAVING EVOLUTION")
+        self.current_control = U_guess
+        self.current_prediction = X_guess
         return X_guess, U_guess
+
 
 
         

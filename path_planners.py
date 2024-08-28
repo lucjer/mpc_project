@@ -2,12 +2,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import animation
 from scipy import sparse
-import vehicle_models as vm
+import vehicles as vm 
 import mpc_controllers as mpc
 import utils
 import os
 from scipy.ndimage import gaussian_filter1d
-
 
 
 
@@ -39,6 +38,8 @@ class PathFollowerVariableSpeed:
         self.velocity_resolution = velocity_resolution # Resolution of the velocity profile
         self.ds_resolution = self.velocity_resolution * self.mpc_controller.model.mpc_params['dt'] # Distance between points on the path for the velocity profile
         self.trajectory = {'x': [], 'y': [], 'yaw': [], 'v': [], 'inp': [], 'k':[]} # Trajectory of the vehicle
+        self.last_X_guess = None # Last predicted state sequence
+        self.last_U_guess = None # Last predicted input sequence
         
     def fetch_reference(self, current_state):
         # Find the index of the closest point on the path
@@ -56,12 +57,12 @@ class PathFollowerVariableSpeed:
             fetching_index += step
             X.append(reference_state)
             U.append(self.trajectory['inp'][self.current_index + step])
-        return X, U
+        return X, np.array(U)
     
     def compute_optimal_input(self, current_state, debug=False):
         X, U = self.fetch_reference(current_state)
-        X_guess, U_guess = self.mpc_controller.profile_solve_sqp(current_state, X, U, debug=debug, sqp_iter=5, alpha=0.2)
-        return U_guess  # Return the entire sequence of predicted inputs
+        X_guess, U_guess = self.mpc_controller.profile_solve_sqp(current_state, X, U, debug=debug, sqp_iter=8, alpha=0.1)
+        return U_guess  
     
     def populate_trajectory(self):
         rx, ry, ryaw, rk, rsteer, s = utils.calc_spline_course(self.path['x'], self.path['y'], ds=self.ds_resolution)
@@ -69,16 +70,16 @@ class PathFollowerVariableSpeed:
             self.trajectory['x'].append(rx_i)
             self.trajectory['y'].append(ry_i)
             self.trajectory['yaw'].append(ryaw_i)
-            a_max = 5
+            a_max = 4
             max_velocity = 15
-            ref_velocity = min(a_max /np.abs(rk_i**2*90+1/8.), max_velocity)
+            ref_velocity = min(a_max /np.abs(rk_i**2*25+1/8.), max_velocity)
             self.trajectory['v'].append(ref_velocity)
-            self.trajectory['inp'].append([rsteer_i, 0])
+            self.trajectory['inp'].append([float(rsteer_i) * 1, 0.])
             self.trajectory['k'].append(rk_i**2)
             
         alpha = 0.0008  # Smoothing factor
         self.trajectory['yaw'] = exponential_moving_average(self.trajectory['yaw'], 0.99)
-        self.trajectory['v'] = apply_gaussian_filter(self.trajectory['v'], sigma=1600)
+        self.trajectory['v'] = apply_gaussian_filter(self.trajectory['v'], sigma=2800)
         plt.plot(self.trajectory['v'])
         plt.savefig('velocity_profile.pdf')
         input()
@@ -160,16 +161,25 @@ class PathFollowerVariableSpeed:
 
 
 # Initialization of the PathFollower and the MPC Controller
-x_ref = np.linspace(0, 300 * np.pi, 1200)
-y_ref = np.cos(x_ref/30 * np.pi ) * 20 +  np.sin(x_ref/60 * np.pi ) * 10
+x_ref = np.linspace(0, 120 * np.pi, 1200)
+y_ref = np.sin(x_ref/40 * np.pi ) * 30
+current_state = np.array([0., 5., np.pi/4, 10.0])
+
 model_kin = vm.KinematicBicycleVariableSpeed('config_files/mpc_bicycle_velocity_config.yaml') 
-n_horizon = 35
-Q = sparse.diags([50, 50, 15, 100])
-R = sparse.diags([5, 1.5])
+n_horizon = 50
+Q = sparse.diags([50, 50, 65, 60])
+R = sparse.diags([5, 1])
 QN = sparse.diags([.1, .1, .1, .1])
 
-InputConstraints = {'umin': np.array([-np.inf, -np.inf]), 
-                    'umax': np.array([np.inf, np.inf])}
+
+u_min_acc = -3
+u_max_acc = 3
+delta_min = -np.pi/6
+delta_max = np.pi/6
+
+InputConstraints = {'umin': [delta_min, u_min_acc], 
+                    'umax': [delta_max, u_max_acc]}
+
 StateConstraints = {'xmin': np.array([-np.inf, -np.inf, -np.inf, -np.inf]),
                     'xmax': np.array([np.inf, np.inf, np.inf, np.inf])}
 mpc_controller = mpc.NMPCSolver(model=model_kin, N=n_horizon, Q=Q, R=R, QN=Q,
@@ -181,7 +191,6 @@ path_follower = PathFollowerVariableSpeed({'x': x_ref, 'y': y_ref}, 0.05, mpc_co
 path_follower.populate_trajectory()
 
 # INITIALIZE SIMULATION
-current_state = np.array([0.,19.5, 0.7, 0.0])
 state_history = [current_state]
 input_history = []
 path_follower.compute_optimal_input(current_state)
@@ -197,17 +206,17 @@ vehicle_velocities = []
 reference_velocities = []
 reference_curvatures = []
 
-while n_sim < 600:
+while n_sim < 200:
     debug = False
     if n_sim % 50 == 0:
-        debug = False
+        debug = True
         
     noise_std_devs = [0.2, 0.2, 0.1, 0.1]  # Different standard deviations for each component
     noise = np.array([np.random.normal(0, std_dev) for std_dev in noise_std_devs])
     disturbed_state = current_state + noise * 0
-    optimal_input = path_follower.compute_optimal_input(disturbed_state, debug=False)
+    optimal_input = path_follower.compute_optimal_input(disturbed_state, debug=debug)
     current_state = model_kin.step_nonlinear_model(current_state, optimal_input[0])  
-    input_history.append(optimal_input)
+    input_history.append(optimal_input[0])
     state_history.append(current_state)
     
     vehicle_velocities.append(current_state[3])
@@ -225,6 +234,8 @@ while n_sim < 600:
         input()
     
     n_sim += 1
+
+
 
 x_traj = [state_history[i][0] for i in range(n_sim)]
 y_traj = [state_history[i][1] for i in range(n_sim)]
@@ -269,7 +280,6 @@ plt.legend()
 plt.figure(figsize=(10, 6))
 plt.plot(vehicle_velocities, label='Vehicle Velocity', color='blue')
 plt.plot(reference_velocities, label='Reference Velocity', color='green', linestyle='--')
-plt.plot(reference_curvatures, label='Reference Curvature', color='red', linestyle='--')
 plt.title("Vehicle Velocity vs Reference Velocity")
 plt.xlabel("Simulation Step")
 plt.ylabel("Velocity [m/s]")
@@ -278,4 +288,25 @@ plt.grid(True)
 plt.savefig('velocity_comparison.pdf')
 plt.show()
 
+
+
+delta_input = [inp[0] for inp in input_history]
+acc_input = [inp[1] for inp in input_history]
+plt.figure(figsize=(10, 6))
+plt.subplot(2, 1, 1)
+plt.plot(delta_input, label='Steering Input', color='blue')
+plt.plot([delta_min]*len(input_history), label='Minimum Steering', color='red', linestyle='dashdot')
+plt.plot([delta_max]*len(input_history), label='Maximum Steering', color='red', linestyle='--') 
+plt.legend()
+plt.subplot(2, 1, 2)
+plt.plot(acc_input, label='Acceleration Input', color='green')
+plt.plot([u_min_acc]*len(input_history), label='Minimum Accel', color='red', linestyle='dashdot')
+plt.plot([u_max_acc]*len(input_history), label='Maximum Accel', color='red', linestyle='--')
+plt.savefig('input_comparison.pdf')
+plt.legend()
+plt.show()
+
 ani.save('trajectory_animation.gif', writer='imagemagick')
+
+
+
