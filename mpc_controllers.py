@@ -17,36 +17,6 @@ import time
 from functools import wraps
 
 
-def timer_decorator(func):
-    call_count = 0
-    total_time = 0
-
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        nonlocal call_count, total_time
-        start_time = time.time()
-        result = func(*args, **kwargs)
-        end_time = time.time()
-        execution_time = end_time - start_time
-
-        call_count += 1
-        total_time += execution_time
-        average_time = total_time / call_count
-
-        # Convert time to milliseconds and print as integer
-        execution_time_ms = int(execution_time * 1000)
-        average_time_ms = int(average_time * 1000)
-
-        print(f"Execution time: {execution_time_ms} ms")
-        
-        if call_count > 1:  # Print average only after the first call
-            print(f"Average execution time after {call_count} calls: {average_time_ms} ms")
-        
-        return result
-
-    return wrapper
-
-
 class NMPCSolver:
     def __init__(self, model, N, Q, R, StateConstraints, InputConstraints, debug_plotting_callback=None, debug_plots_folder=None):
         """
@@ -59,6 +29,8 @@ class NMPCSolver:
         :param R: input cost matrix
         :param StateConstraints: dict of state constraints
         :param InputConstraints: dict of input constraints
+        :oaram debug_plotting_callback: callback function for debugging
+        :param debug_plots_folder: folder to save debug plots
         """
 
         # Parameters
@@ -88,7 +60,7 @@ class NMPCSolver:
         print("MPC Class initialized successfully")
 
 
-    def profile_solve_sqp(self, *args, **kwargs):
+    def profile_solve_sqp(self, *args, **kwargs): # Used for profiling. Useful for investigating performance bottlenecks
         profiler = cProfile.Profile()
         profiler.enable()
 
@@ -112,7 +84,6 @@ class NMPCSolver:
         u_max_array = np.tile(u_max, self.N) + np.array(U_ref).reshape(self.N * self.nu, )
         return u_min_array, u_max_array
     
-    @timer_decorator
     def solve_sqp(self, current_state, X_ref, U_ref, X_guess=None, U_guess=None, debug=False, sqp_iter=1, alpha=1.0):
         """
         Initialize the optimization problem.
@@ -127,10 +98,10 @@ class NMPCSolver:
                 X_guess = np.zeros_like(self.current_prediction)
                 # Initialize guess with the previous solution
                 U_guess[0:-1] = self.current_control[1:]
-                U_guess[-1] = self.current_control[-1] 
-                # Duplicate the last state and control
                 X_guess[0:-1] = self.current_prediction[1:]
-                X_guess[-1] = self.current_prediction[-1]
+                U_guess[-1] = self.current_control[-1] 
+                X_guess[-1] = self.model.step_nonlinear_model(self.current_prediction[-1], self.current_control[-1])
+                # Duplicate the last state and control
             else:
                 X_guess = X_ref.copy()
                 U_guess = U_ref.copy()
