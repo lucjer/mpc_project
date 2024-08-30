@@ -20,17 +20,11 @@ def apply_gaussian_filter(data, sigma):
     """
     return gaussian_filter1d(data, sigma=sigma)
 
-# Exponential Moving Average Function
-def exponential_moving_average(data, alpha):
-    ema = [data[0]]  # Start the EMA with the first data point
-    for i in range(1, len(data)):
-        ema.append(alpha * data[i] + (1 - alpha) * ema[-1])
-    return ema
 
 # PathFollowerVariableSpeed Class Definition
 class PathFollowerVariableSpeed:
     """ Path follower that follows a path with variable speed """
-    def __init__(self, path, ds, mpc_controller, velocity_resolution):
+    def __init__(self, path, ds, mpc_controller, velocity_resolution, search_radius=500, sigma=1000):
         """ Constructor for the PathFollowerVariableSpeed class """
         self.path = path # Collection of (X, Y) points that define the path
         self.default_ds = ds # Default distance between points on the path
@@ -41,10 +35,12 @@ class PathFollowerVariableSpeed:
         self.trajectory = {'x': [], 'y': [], 'yaw': [], 'v': [], 'inp': [], 'k':[]} # Trajectory of the vehicle
         self.last_X_guess = None # Last predicted state sequence
         self.last_U_guess = None # Last predicted input sequence
+        self.search_radius = search_radius # Search radius for finding the closest point on the path
+        self.sigma = sigma
         
     def fetch_reference(self, current_state):
         # Find the index of the closest point on the path
-        self.current_index = self.find_closest_index(current_state, self.trajectory)
+        self.current_index = self.find_closest_index(current_state, self.trajectory, self.current_index, self.search_radius)
         # Find the index of the next point on the path
         X = []
         U = []
@@ -62,7 +58,7 @@ class PathFollowerVariableSpeed:
     
     def compute_optimal_input(self, current_state, debug=False):
         X, U = self.fetch_reference(current_state)
-        X_guess, U_guess = self.mpc_controller.profile_solve_sqp(current_state, X, U, debug=debug, sqp_iter=3, alpha=0.1)
+        X_guess, U_guess = self.mpc_controller.profile_solve_sqp(current_state, X, U, debug=debug)
         return U_guess  
     
     def populate_trajectory(self):
@@ -78,15 +74,35 @@ class PathFollowerVariableSpeed:
             self.trajectory['inp'].append([float(rsteer_i) * 1, 0.])
             self.trajectory['k'].append(rk_i**2)
             
-        alpha = 0.0008  # Smoothing factor
-        self.trajectory['yaw'] = exponential_moving_average(self.trajectory['yaw'], 0.99)
-        self.trajectory['v'] = apply_gaussian_filter(self.trajectory['v'], sigma=2800)
+        self.trajectory['v'] = apply_gaussian_filter(self.trajectory['v'], sigma=self.sigma)
             
     @staticmethod
-    def find_closest_index(current_state, trajectory, start_index=0, end_index=None):
+    def find_closest_index_old(current_state, trajectory):
         distances = np.sqrt((np.array([x for x in trajectory['x']]) - current_state[0])**2+ 
                             (np.array([y for y in trajectory['y']]) - current_state[1])**2)
         return np.argmin(distances)
+
+
+    def find_closest_index(self, current_state, trajectory, start_index=0, search_radius=500):
+        if search_radius is None:
+            return self.find_closest_index_old(current_state, trajectory)
+        # Determine the search range
+        if start_index is None:
+            start = 0
+            end = len(trajectory['x'])
+        else:
+            start = max(start_index - search_radius, 0)
+            end = min(start_index + search_radius, len(trajectory['x']))
+            
+        # Compute distances within the search range
+        distances = np.sqrt((np.array([x for x in trajectory['x'][start:end]]) - current_state[0])**2+ 
+                            (np.array([y for y in trajectory['y'][start:end]]) - current_state[1])**2)
+        
+        # Find the index of the closest point within the search range
+        min_index_in_window = np.argmin(distances)
+        
+        # Return the absolute index
+        return start + min_index_in_window
 
 
     def plot_fetched_trajectory_and_input(self, current_state, optimal_input, n_sim, save_dir='debug_plots'):

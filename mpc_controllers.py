@@ -18,7 +18,7 @@ from functools import wraps
 
 
 class NMPCSolver:
-    def __init__(self, model, N, Q, R, StateConstraints, InputConstraints, debug_plotting_callback=None, debug_plots_folder=None):
+    def __init__(self, model, N, Q, R, StateConstraints, InputConstraints, sqp_iters=1, alpha=0.1, debug_plotting_callback=None, debug_plots_folder=None):
         """
         Generic MPC constructor for SQP optimization
         :param model: dynamical system model
@@ -53,6 +53,8 @@ class NMPCSolver:
         
         # Initialize the optimizer
         self.optimizer = osqp.OSQP()
+        self.sqp_iters = sqp_iters
+        self.alpha = alpha
 
         # Debugging
         self.debug_plotting_callback = debug_plotting_callback
@@ -84,7 +86,7 @@ class NMPCSolver:
         u_max_array = np.tile(u_max, self.N) + np.array(U_ref).reshape(self.N * self.nu, )
         return u_min_array, u_max_array
     
-    def solve_sqp(self, current_state, X_ref, U_ref, X_guess=None, U_guess=None, debug=False, sqp_iter=1, alpha=1.0):
+    def solve_sqp(self, current_state, X_ref, U_ref, X_guess=None, U_guess=None, debug=False):
         """
         Initialize the optimization problem.
         :param X: current reference state
@@ -123,7 +125,7 @@ class NMPCSolver:
         Aeq = sparse.lil_matrix((self.nx * self.N, self.nx * self.N + self.nu * self.N))
 
         # Iterate over horizon
-        for j in range(sqp_iter):
+        for j in range(self.sqp_iters):
             # Initialize residuals
             r = np.zeros(self.nx * self.N)
             step_nonlinear_result = np.array(self.model.step_nonlinear_model(current_state, U_guess[0]))
@@ -178,8 +180,8 @@ class NMPCSolver:
             delta_X = np.reshape(dec.x[:self.N * self.nx], (self.N, self.nx))
 
             # Update guesses
-            X_guess += alpha * delta_X
-            U_guess += alpha * delta_U
+            X_guess += self.alpha * delta_X
+            U_guess += self.alpha * delta_U
 
             if debug:
                 X_guess_evolution.append(X_guess.copy())
