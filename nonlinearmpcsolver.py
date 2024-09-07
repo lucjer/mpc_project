@@ -59,7 +59,6 @@ class NMPCSolver:
         # Debugging
         self.debug_plotting_callback = debug_plotting_callback
         self.debug_plots_folder = debug_plots_folder
-        print("MPC Class initialized successfully")
 
 
     def profile_solve_sqp(self, *args, **kwargs): # Used for profiling. Useful for investigating performance bottlenecks
@@ -79,11 +78,10 @@ class NMPCSolver:
         :param U_guess: current control guess
         :return: input constraints
         """
-        U_ref = U_ref
         u_min = self.input_constraints['umin'] 
         u_max = self.input_constraints['umax']
-        u_min_array = np.tile(u_min, self.N) + np.array(U_ref).reshape(self.N * self.nu, )
-        u_max_array = np.tile(u_max, self.N) + np.array(U_ref).reshape(self.N * self.nu, )
+        u_min_array = np.tile(u_min, self.N) - np.array(U_ref).reshape(self.N * self.nu, )
+        u_max_array = np.tile(u_max, self.N) - np.array(U_ref).reshape(self.N * self.nu, )
         return u_min_array, u_max_array
     
     def solve_sqp(self, current_state, X_ref, U_ref, X_guess=None, U_guess=None, debug=False):
@@ -123,11 +121,12 @@ class NMPCSolver:
         A_states = np.zeros((self.nx * self.N, self.nx * self.N))
         B_states = np.zeros((self.nx * self.N, self.nu * self.N))
         Aeq = sparse.lil_matrix((self.nx * self.N, self.nx * self.N + self.nu * self.N))
+        r = np.zeros(self.nx * self.N)
+
 
         # Iterate over horizon
         for j in range(self.sqp_iters):
             # Initialize residuals
-            r = np.zeros(self.nx * self.N)
             step_nonlinear_result = np.array(self.model.step_nonlinear_model(current_state, U_guess[0]))
             r[0:self.nx] = step_nonlinear_result - X_guess[0]
 
@@ -142,7 +141,7 @@ class NMPCSolver:
 
                 r[(k + 1) * self.nx: (k + 2) * self.nx] = self.model.step_nonlinear_model(state_guess_k, input_guess_k) - X_guess[k+1]
 
-            # Compute Aeq and Aineq: AX + BU + r = X
+            # Compute Aeq: AX + BU + r = X
             Ax = - I_Nx + sparse.csc_matrix(A_states)
             Bu = sparse.csc_matrix(B_states)
             # Update Aeq for dynamics equality constraints
@@ -157,7 +156,8 @@ class NMPCSolver:
             A_states_full = sparse.vstack([Aeq, Aineq], format='csc')
 
             # Update input constraints
-            u_min, u_max = self.compute_input_constraints(-U_guess)
+            u_min, u_max = self.compute_input_constraints(U_guess)
+            # TODO: Input inequality constraints only implemented for the linear case!
             # TODO: State inequality constraints not implemented yet!
 
             # Construct lower and upper bounds for input and state constraints
@@ -189,9 +189,9 @@ class NMPCSolver:
 
         if debug:
             results = {'X_guess': X_guess, 'U_guess': U_guess, 'X_guess_evolution': X_guess_evolution, 'U_guess_evolution': U_guess_evolution}
-            self.debug_plotting_callback(results, folder_path=self.debug_plots_folder)
+            self.debug_plotting_callback(current_state, results, folder_path=self.debug_plots_folder)
 
-        # Update current state and control for next iteration    
+        # Update current state and control guesses for next call to the solver    
         self.current_control = U_guess
         self.current_prediction = X_guess
         return X_guess, U_guess

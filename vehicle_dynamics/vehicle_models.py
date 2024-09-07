@@ -2,118 +2,7 @@ import numpy as np
 import math
 
 from mpc_model import MPCModel
-
-
-class KinematicBicycleVariableSpeed(MPCModel):
-    def nonlinear_model(self, state, input):
-        l_front = self.model_params["l_f"]
-        l_rear = self.model_params["l_r"]
-
-        theta = state[2]
-        v = state[3]
-        delta = input[0]
-        a = input[1]
-
-        beta = np.arctan((l_rear / (l_front + l_rear)) * np.tan(delta))
-        state_dot = np.zeros((3,))
-        x_dot = v * math.cos(theta + beta)
-        y_dot = v * math.sin(theta + beta)
-        theta_dot = (v / l_rear) * math.sin(beta)
-        v_dot = a
-
-        state_dot[0] = x_dot
-        state_dot[1] = y_dot
-        state_dot[2] = theta_dot
-        state_dot[3] = v_dot
-
-        return state_dot
-    
-    def linearization_model(
-        self, state, inputs, reference_state=None, reference_input=None, debug=False
-    ):
-        """
-        Linearizes the vehicle model around the given state and input.
-
-        Args:
-            state (list): The current state of the vehicle [x, y, theta].
-            input (list): The current input to the vehicle [delta].
-            debug (bool): If True, prints the matrices A, B, and C.
-
-        Returns:
-            tuple: A tuple containing the linearized state matrix A, the linearized input matrix B, and matrix C.
-        """
-        l_front = self.model_params["l_f"]
-        l_rear = self.model_params["l_r"]
-        v = self.model_params["v"]
-        theta = state[2]
-        delta = inputs[0]
-        a = inputs[1]
-
-        # Calculate beta
-        alpha = l_rear / (l_front + l_rear)
-        beta = np.arctan(alpha * np.tan(delta))
-        d_beta_dtan_delta = 1 / (alpha**2 * np.tan(delta) ** 2 + 1)
-        d_tan_delta_d_delta = 1 / (math.cos(delta) ** 2) * alpha
-        d_beta_d_delta = d_beta_dtan_delta * d_tan_delta_d_delta
-
-        # Jacobian A
-        A = np.zeros((4, 4))
-        for i in range(4):
-            A[i, i] = 1
-        A[0, 2] = -v * math.sin(theta + beta) * self.mpc_params["dt"]
-        A[0, 3] = v * math.cos(theta + beta) * self.mpc_params["dt"]
-        A[1, 2] = v * math.cos(theta + beta) * self.mpc_params["dt"]
-        A[1, 3] = v * math.sin(theta + beta) * self.mpc_params["dt"]
-
-        # Jacobian B
-        B = np.zeros((4, 2))
-        B[0, 0] = -v * math.sin(theta + beta) * d_beta_d_delta * self.mpc_params["dt"]
-        B[1, 0] = v * math.cos(theta + beta) * d_beta_d_delta * self.mpc_params["dt"]
-        B[2, 0] = (v / l_rear) * math.cos(beta) * d_beta_d_delta * self.mpc_params["dt"]
-        B[3, 1] = self.mpc_params["dt"]
-
-        # Jacobian C
-        C = np.zeros((4, 4))
-
-        if debug:
-            print("Linearized State Matrix A:")
-            print(A)
-            print("\nLinearized Input Matrix B:")
-            print(B)
-            print("\nMatrix C:")
-            print(C)
-
-        return A, B, C, B
-
-    def output_model(self, state, input):
-        return state
-    
-    def step_nonlinear_model(self, state, inp, debug=False):
-
-        new_state = np.zeros((4,))
-        l_front = self.model_params["l_f"]
-        l_rear = self.model_params["l_r"]
-        v = self.model_params["v"]
-        x = state[0]
-        y = state[1]
-        theta = state[2]
-        v = state[3]
-        delta = inp[0]
-        a = inp[1]
-
-        beta = np.arctan((l_rear / (l_front + l_rear)) * np.tan(delta))
-        x_dot = v * math.cos(theta + beta)
-        y_dot = v * math.sin(theta + beta)
-        theta_dot = (v / l_rear) * math.sin(beta)
-
-        new_state[0] = x_dot * self.mpc_params["dt"] + x
-        new_state[1] = y_dot * self.mpc_params["dt"] + y
-        new_state[2] = theta_dot * self.mpc_params["dt"] + theta
-        new_state[3] = a * self.mpc_params["dt"] + v
-        return new_state
-
 from numba import jit
-
 
 class KinematicBicycleVariableSpeed(MPCModel):
 
@@ -234,19 +123,12 @@ class KinematicBicycleVariableSpeed(MPCModel):
     def output_model(self, state, input):
         return state
 
-
-import numpy as np
-import math
-from numba import jit
-
 class KinematicBicycleConstantSpeed(MPCModel):
     def __init__(self, model_params, mpc_params):
-        print("NUMBA JIT COMPILATION")
         self.model_params = model_params
         self.mpc_params = mpc_params
 
     def nonlinear_model(self, state, input):
-        print("NUMBA JIT COMPILATION")
 
         l_front = self.model_params["l_f"]
         l_rear = self.model_params["l_r"]

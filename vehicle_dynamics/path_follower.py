@@ -4,39 +4,28 @@ import matplotlib.pyplot as plt
 from matplotlib import animation
 from scipy import sparse
 import vehicle_dynamics.vehicle_models as vm 
-import mpc_controllers as mpc
-import utils
+import spline 
 import os
 from scipy.ndimage import gaussian_filter1d
 
 
-
-def apply_gaussian_filter(data, sigma):
-    """
-    Apply Gaussian filter to smooth the data.
-    :param data: Input data to be smoothed
-    :param sigma: Standard deviation of the Gaussian kernel
-    :return: Smoothed data
-    """
-    return gaussian_filter1d(data, sigma=sigma)
-
-
-# PathFollowerVariableSpeed Class Definition
-class PathFollowerVariableSpeed:
+class PathFollower:
     """ Path follower that follows a path with variable speed """
-    def __init__(self, path, ds, mpc_controller, velocity_resolution, search_radius=500, sigma=1000):
+    def __init__(self, path, mpc_controller,  ds=0.1, velocity_resolution=0.1, maximum_velocity=15, maximum_lateral_acceleration=3, search_radius=500, sigma=1000):
         """ Constructor for the PathFollowerVariableSpeed class """
         self.path = path # Collection of (X, Y) points that define the path
         self.default_ds = ds # Default distance between points on the path
         self.current_index = None # Index of the current point on the path
+        self.farthest_index = None
         self.mpc_controller = mpc_controller # MPC controller for the vehicle 
         self.velocity_resolution = velocity_resolution # Resolution of the velocity profile
+        self.maximum_lateral_acceleration = maximum_lateral_acceleration
+        self.maximum_velocity = maximum_velocity
         self.ds_resolution = self.velocity_resolution * self.mpc_controller.model.mpc_params['dt'] # Distance between points on the path for the velocity profile
         self.trajectory = {'x': [], 'y': [], 'yaw': [], 'v': [], 'inp': [], 'k':[]} # Trajectory of the vehicle
-        self.last_X_guess = None # Last predicted state sequence
-        self.last_U_guess = None # Last predicted input sequence
         self.search_radius = search_radius # Search radius for finding the closest point on the path
-        self.sigma = sigma
+        self.sigma = sigma # Sigma 
+        self.stopping = False
         
     def fetch_reference(self, current_state):
         # Find the index of the closest point on the path
@@ -45,47 +34,63 @@ class PathFollowerVariableSpeed:
         X = []
         U = []
         fetching_index = self.current_index
+        complete_fetch = True
         for _ in range(self.mpc_controller.N):
             step = int(self.trajectory['v'][fetching_index] // self.velocity_resolution)
-            reference_state = np.array([self.trajectory['x'][fetching_index + step],
-                                        self.trajectory['y'][fetching_index + step],
-                                        self.trajectory['yaw'][fetching_index + step],
-                                        self.trajectory['v'][fetching_index + step]])
-            fetching_index += step
+            index_to_fetch = fetching_index + step
+            if index_to_fetch < len(self.trajectory['x']): 
+                reference_state = np.array([self.trajectory['x'][index_to_fetch],
+                                            self.trajectory['y'][index_to_fetch],
+                                            self.trajectory['yaw'][index_to_fetch],
+                                            self.trajectory['v'][index_to_fetch]])
+            else: # If out of range, toggle the car stop
+                complete_fetch = False
+                break
             X.append(reference_state)
-            U.append(self.trajectory['inp'][self.current_index + step])
-        return X, np.array(U)
+            U.append(self.trajectory['inp'][index_to_fetch])
+            fetching_index += step
+
+        if complete_fetch:
+            stopping = False
+            return X, np.array(U), stopping
+        else:
+            stopping = True
+            return None, None, stopping
     
     def compute_optimal_input(self, current_state, debug=False):
-        X, U = self.fetch_reference(current_state)
-        X_guess, U_guess = self.mpc_controller.profile_solve_sqp(current_state, X, U, debug=debug)
+        if not self.stopping:
+            X, U, self.stopping = self.fetch_reference(current_state)
+
+        if not self.stopping: # If the end of the path is not reached
+            X_guess, U_guess = self.mpc_controller.profile_solve_sqp(current_state, X, U, debug=debug)
+        else: # Naively stop the car ignoring the deviation from the actual path.
+            X = np.zeros((self.mpc_controller.N, self.mpc_controller.nx))
+            U = np.zeros((self.mpc_controller.N, self.mpc_controller.nu))
+            self.mpc_controller.Q  = sparse.diags([0, 0, 0, 20]) # State cost matrix - Only control velocity
+            X_guess, U_guess= self.mpc_controller.profile_solve_sqp(current_state, X, U, debug=debug)
         return U_guess  
     
     def populate_trajectory(self):
-        rx, ry, ryaw, rk, rsteer, s = utils.calc_spline_course(self.path['x'], self.path['y'], ds=self.ds_resolution)
+        rx, ry, ryaw, rk, rsteer, s = spline.calc_spline_course(self.path['x'], self.path['y'], ds=self.ds_resolution)
         for rx_i, ry_i, ryaw_i, rsteer_i, rk_i in zip(rx, ry, ryaw, rsteer, rk):
             self.trajectory['x'].append(rx_i)
             self.trajectory['y'].append(ry_i)
             self.trajectory['yaw'].append(ryaw_i)
-            a_max = 4
-            max_velocity = 15
-            ref_velocity = min(a_max /np.abs(rk_i**2*25+1/8.), max_velocity)
+            ref_velocity = min(np.sqrt(self.maximum_lateral_acceleration / np.abs(rk_i + 0.01)), self.maximum_velocity)
             self.trajectory['v'].append(ref_velocity)
-            self.trajectory['inp'].append([float(rsteer_i) * 1, 0.])
-            self.trajectory['k'].append(rk_i**2)
-            
-        self.trajectory['v'] = apply_gaussian_filter(self.trajectory['v'], sigma=self.sigma)
-            
-    @staticmethod
-    def find_closest_index_old(current_state, trajectory):
-        distances = np.sqrt((np.array([x for x in trajectory['x']]) - current_state[0])**2+ 
-                            (np.array([y for y in trajectory['y']]) - current_state[1])**2)
-        return np.argmin(distances)
+            # TODO: Add the acceleration input to the trajectory. 
+            # For now, set it to 0, optimization can handle it and minimize acceleration inputs (deviation from 0)
+            self.trajectory['inp'].append([float(rsteer_i), 0.])
+            self.trajectory['k'].append(np.abs(rk_i))
+        self.trajectory['v'] = gaussian_filter1d(self.trajectory['v'], sigma=self.sigma)
 
 
     def find_closest_index(self, current_state, trajectory, start_index=0, search_radius=500):
-        if search_radius is None:
-            return self.find_closest_index_old(current_state, trajectory)
+        if search_radius is None: # If no search radius is provided, search the entire trajectory
+            distances = np.sqrt((np.array([x for x in trajectory['x']]) - current_state[0])**2+ 
+                            (np.array([y for y in trajectory['y']]) - current_state[1])**2)
+            return np.argmin(distances)
+        
         # Determine the search range
         if start_index is None:
             start = 0
@@ -94,7 +99,7 @@ class PathFollowerVariableSpeed:
             start = max(start_index - search_radius, 0)
             end = min(start_index + search_radius, len(trajectory['x']))
             
-        # Compute distances within the search range
+        # Compute distances within the search range - No need to search whole trajectory
         distances = np.sqrt((np.array([x for x in trajectory['x'][start:end]]) - current_state[0])**2+ 
                             (np.array([y for y in trajectory['y'][start:end]]) - current_state[1])**2)
         
@@ -106,7 +111,7 @@ class PathFollowerVariableSpeed:
 
 
     def plot_fetched_trajectory_and_input(self, current_state, optimal_input, n_sim, save_dir='debug_plots'):
-        """Plot the fetched reference trajectory and compare the reference input with the optimal input."""
+        """Used for debug and demonstration, plot the fetched reference trajectory and compare the reference input with the optimal input."""
         X_ref, U_ref = self.fetch_reference(current_state)
 
         ref_x = [state[0] for state in X_ref]

@@ -3,7 +3,7 @@ model_params:
   n_states: 4
   n_inputs: 2
   n_outputs: 3
-  l_f: 1
+  l_f: 2.3
   l_r: 0.1
   v: 1
   
