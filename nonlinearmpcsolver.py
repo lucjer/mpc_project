@@ -101,8 +101,8 @@ class NMPCSolver:
                 U_guess[0:-1] = self.current_input_guess[1:]
                 X_guess[0:-1] = self.current_state_guess[1:]
                 U_guess[-1] = self.current_input_guess[-1] 
+                # Compute the final state by re-applying the last input (naif solution)
                 X_guess[-1] = self.model.step_nonlinear_model(self.current_state_guess[-1], self.current_input_guess[-1])
-                # Duplicate the last state and control
             else:
                 X_guess = X_ref.copy()
                 U_guess = U_ref.copy()
@@ -124,10 +124,9 @@ class NMPCSolver:
         Aeq = sparse.lil_matrix((self.nx * self.N, self.nx * self.N + self.nu * self.N))
         r = np.zeros(self.nx * self.N)
 
-
-        # Iterate over horizon
         for j in range(self.sqp_iters):
-            # Initialize residuals
+            # 1) Dynamics Constraints 
+            # Initialize residuals 
             step_nonlinear_result = np.array(self.model.step_nonlinear_model(current_state, U_guess[0]))
             r[0:self.nx] = step_nonlinear_result - X_guess[0]
 
@@ -152,20 +151,26 @@ class NMPCSolver:
             leq = - r
             ueq = - r
 
-            # Construct Aineq and the full constraint matrix
+            # 2) Inequality Constraints on states and inputs
             Aineq = sparse.eye(self.N * self.nx + self.N * self.nu, format='csc')
-            A_states_full = sparse.vstack([Aeq, Aineq], format='csc')
-
-            # Update input constraints
+            # Compute input constraints
+            # TODO: Input inequality constraints only implemented for the linear case
             u_min, u_max = self.compute_input_constraints(U_guess)
-            # TODO: Input inequality constraints only implemented for the linear case!
-            # TODO: State inequality constraints not implemented yet!
+            # TODO: State inequality constraints not implemented yet
+            states_min = [-np.inf] * self.N * self.nx 
+            states_max = [np.inf] * self.N * self.nx 
+            # Combine input and state constraints
+            lineq = np.hstack(states_min + list(u_min))
+            uineq = np.hstack(states_max + list(u_max))
 
-            # Construct lower and upper bounds for input and state constraints
-            lineq = np.hstack([-np.inf] * self.N * self.nx + list(u_min))
-            uineq = np.hstack([np.inf] * self.N * self.nx + list(u_max))
+            # TODO: 3) Add implementation for constraints on variations of input signals 
+            
+
             l = np.hstack([leq, lineq])
             u = np.hstack([ueq, uineq])
+
+            A_full = sparse.vstack([Aeq, Aineq], format='csc')
+
 
             # Objective function
             xug = np.hstack([np.concatenate(X_guess), np.concatenate(U_guess)])
@@ -175,7 +180,7 @@ class NMPCSolver:
 
             # Solve quadratic program
             self.optimizer = osqp.OSQP()
-            self.optimizer.setup(P=P, q=q, A=A_states_full, l=l, u=u, verbose=False)
+            self.optimizer.setup(P=P, q=q, A=A_full, l=l, u=u, verbose=False)
             dec = self.optimizer.solve()
             delta_U = np.reshape(dec.x[-self.N * self.nu:], (self.N, self.nu))
             delta_X = np.reshape(dec.x[:self.N * self.nx], (self.N, self.nx))

@@ -111,7 +111,7 @@ class PathFollower:
 
     def plot_fetched_trajectory_and_input(self, current_state, optimal_input, n_sim, save_dir='debug_plots'):
         """Used for debug and demonstration, plot the fetched reference trajectory and compare the reference input with the optimal input."""
-        X_ref, U_ref = self.fetch_reference(current_state)
+        X_ref, U_ref, _ = self.fetch_reference(current_state)
 
         ref_x = [state[0] for state in X_ref]
         ref_y = [state[1] for state in X_ref]
