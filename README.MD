@@ -1,6 +1,6 @@
 # Nonlinear Model Predictive Control (NMPC) Solver
 
-This repository contains an implementation of a Nonlinear Model Predictive Control (NMPC) solver, utilizing Sequential Quadratic Programming (SQP) and Real-Time Iteration (RTI) algorithms. These algorithms are derived from the work of Gros et al. (2020), which bridges the gap between linear and nonlinear MPC. The purpose of this repository is to demonstrate how to effectively solve a complex NMPC problem using OSQP in Python.
+This repository contains an implementation of a Nonlinear Model Predictive Control (NMPC) solver, utilizing Sequential Quadratic Programming (SQP) and Real-Time Iteration (RTI) algorithms. These algorithms are derived from the work of Gros et al. (2020). The purpose of this repository is to demonstrate how to effectively solve a complex NMPC problem using OSQP in Python.
 
 ## Background
 
@@ -10,8 +10,9 @@ The NMPC solver is based on the following paper:
 Gros, S., Zanon, M., Quirynen, R., Bemporad, A., & Diehl, M. (2020). From linear to nonlinear MPC: bridging the gap via the real-time iteration. *International Journal of Control, 93*(1), 62-80. [Link to the Paper](https://cse.lab.imtlucca.it/~bemporad/publications/papers/ijc_rtiltv.pdf)
 
 
-## Algorithm Details - NMPC and SQP Formulation [Gros et al. (2020)]
-
+## Algorithm Details - NMPC and SQP Formulation
+_The following is from [Gros et al. (2020)], reported here for convenience._
+ 
 **Nonlinear Programming (NLP) Problem:**
 
 Given the state estimate $\hat{x}_i$ and reference trajectories $\boldsymbol{x}_i^{\text{ref}}$ and $\boldsymbol{u}_i^{\text{ref}}$, the optimization problem is:
@@ -22,10 +23,11 @@ Given the state estimate $\hat{x}_i$ and reference trajectories $\boldsymbol{x}_
 Subject to:
 
 - Initial state: $x_{i, 0} = \hat{x}_i$
-- System dynamics: $x_{i, k+1} = f(x_{i, k}, u_{i, k})$ for $k = 0, \dots, N-1$
+- System's dynamics: $x_{i, k+1} = f(x_{i, k}, u_{i, k})$ for $k = 0, \dots, N-1$
 
 
 **Sequential quadratic programming (SQP) for NMPC**
+
 In the SQP approach, the optimization problem is iteratively approximated by quadratic programming (QP) problems. Each QP provides a Newton direction, guiding steps toward the solution from the current guess. These steps, partial or full, are repeated until convergence.
 
 
@@ -38,7 +40,7 @@ At a guess $\left(\boldsymbol{x}_i^{\text {guess }}, \boldsymbol{u}_i^{\text {gu
 
 with 
 
-<img src="./readme_imgs/linearizations.png" width="500" />
+<img src="./readme_imgs/linearizations.png" width="350" />
 
 ### Algorithm 1: SQP for NMPC at Discrete Time $i$
 
@@ -62,34 +64,30 @@ with
 **Output:**
 - NMPC solution $(x_i, u_i) = (\boldsymbol{x}_i^{\text{guess}}, \boldsymbol{u}_i^{\text{guess}})$
 
-# Implementation Details - How to use the NMPCSolver Class
+# Implementation Details
 
 ## Inspiration and Design
 
-The implementation of the NMPCSolver class draws some inspiration from the [MPC class](https://github.com/matssteinweg/Multi-Purpose-MPC/blob/master/src/MPC.py) found in a public repository by Mats Steinweg. However, this solver differs in several important ways:
-
-- **Modularity:** The implementation is highly modular (model agnostic), allowing for easy customization and adaptation to various use cases.
-- **General Applicability:** This solver does not assume any specific dynamical model (e.g., vehicle model). It is designed to be general-purpose, capable of handling a wide range of dynamical systems with minimal adaptation.
-- **SQP Implementation:** This solver uses an efficient SQP implementation for the solution of the NMPC problem.
+The implementation of the NMPCSolver class draws some inspiration from the [Linear MPC class](https://github.com/matssteinweg/Multi-Purpose-MPC/blob/master/src/MPC.py) found in a public repository by Mats Steinweg. Compared to the former, this solver does not assume any specific dynamical model (e.g., vehicle model). It is designed to be general-purpose, capable of handling a wide range of dynamical systems with minimal adaptation.
+Furthermore, this solver uses an SQP implementation for the solution of the NMPC problem.
 
 ## Overview
 
-The `NMPCSolver` class is designed to work with any system that can be described by the `MPCModel` abstract class. It uses the OSQP (Operator Splitting Quadratic Program) solver for optimization.
-
-## TODO List
-
-- [ ] **Implement State Constraints**
-  - [ ] Implement Linear State Constraints
-  - [ ] Implement Nonlinear State Constraints
-
-- [ ] **Implement Control Constraints**
-  - [X] Implement Linear Control Constraints
-  - [ ] Implement Nonlinear Control Constraints
-
-- [ ] **Implement Non-Quadratic Cost functions**
-
+The `NMPCSolver` class is designed to work with any system that can be described by the `MPCModel` abstract class. It uses the OSQP (Operator Splitting Quadratic Program) solver for the optimization at each SQP step.
 
 # NMPC Solver - How to use
+
+
+## MPCModel Interface
+
+To use the `NMPCSolver`, you must implement a model class that inherits from `MPCModel` with the following methods implemented:
+
+- [REQUIRED] **`step_nonlinear_model(state, inp)`**: Implements the discrete-time nonlinear model of the system.
+
+- [REQUIRED] **`linearization_model(state, inp, reference_state, reference_input)`**: Provides the linearized model of the discrete-time nonlinear model of the system.
+
+- **`nonlinear_model(state, inp)`**: Defines the nonlinear (continuous time) vector field. Not directly used by the `MPCSolver`, this method is useful for simulating the system's dynamics.
+
 
 ## Initialization
 
@@ -100,49 +98,19 @@ solver = NMPCSolver(model, N, Q, R, state_constraints, input_constraints)
 ### Parameters:
 
 - **`model`**: An instance of a class derived from `MPCModel`. 
-- **`N`**: The prediction horizon as an integer, specifying the number of future time steps the solver will consider.
+- **`N`**: The number of prediction steps.
 - **`Q`**: State cost matrix, defines the cost associated with the state deviations.
 - **`R`**: Input cost matrix, defines the cost associated with the control inputs.
 - **`state_constraints`**: A dictionary defining constraints on the state variables.
 - **`input_constraints`**: A dictionary defining constraints on the control inputs.
 
-## MPCModel Interface
-
-To use the `NMPCSolver`, you must implement a model class that inherits from `MPCModel` wit the following methods implemented:
-
-- **`step_nonlinear_model(state, inp)`**: Implements the discrete-time nonlinear model of the system.
-
-- **`linearization_model(state, inp, reference_state, reference_input)`**: Provides the linearized model of the discrete-tume nonlinear model of the system.
-
-- **`nonlinear_model(state, inp)`**: Defines the nonlinear (continuous time) vector field. Not directly used by the `MPCSolver`, this method is useful for simulating the system dynamics.
-
-- **`output_model(state, inp)`**: Defines the output model. Currently not used by the `MPCSolver`, will be used in future extensions.
-
-# NMPC Solver
-
-## Initialization
-
-To create an NMPC (Nonlinear Model Predictive Control) solver, instantiate the `NMPCSolver` class with the following parameters:
-
-solver = NMPCSolver(model, N, Q, R, state_constraints, input_constraints)
-
-### Parameters:
-
-- **`model`**: An instance of a class derived from `MPCModel`. This class should implement the required methods for the NMPC solver to function properly.
-- **`N`**: The prediction horizon as an integer, specifying the number of future time steps the solver will consider.
-- **`Q`**: State cost matrix, which defines the cost associated with the state deviations.
-- **`R`**: Input cost matrix, which defines the cost associated with the control inputs.
-- **`state_constraints`**: A dictionary defining constraints on the state variables.
-- **`input_constraints`**: A dictionary defining constraints on the control input.
-- **`debug_plotting_callback`**: A callback function that can be used for debugging, e.g. evolution of the SQP iterations. The debugging callback usually depends on the type of model and respective control inputs.
-- **`debug_plots_folder`**: Location where to save the debugging plots.
 
 ### Solving the NMPC Problem
 
 To solve the NMPC problem, use the `solve_sqp` method:
 
 ```python
-X_optimal, U_optimal = solver.solve_sqp(current_state, X_ref, U_ref, X_guess=None, U_guess=None, debug=False, sqp_iter=1, alpha=1.0)
+X_optimal, U_optimal = solver.solve_sqp(current_state, X_ref, U_ref, X_guess=None, U_guess=None, debug=False)
 ```
 
 Parameters:
@@ -152,8 +120,6 @@ Parameters:
 - `X_guess`: Initial guess for state prediction
 - `U_guess`: Initial guess for input sequence
 - `debug`: Boolean flag for debug mode (default: False)
-- `sqp_iter`: Number of SQP iterations (default: 1)
-- `alpha`: Step size parameter (default: 1.0)
 
 Returns:
 - `X_optimal`: Optimal state trajectory
@@ -162,7 +128,7 @@ Returns:
 ## `solve_sqp` Method Overview
 
 ### Initialization
-- If no initial guesses are provided for states and controls, the method initializes them using the shifted values computed at the previous time step (if available) or the reference values (if no other guess is available).
+- If no initial guesses are provided for states and controls, the method initializes them using the shifted values computed at the previous time step (if available) or the reference values (if no other guess is provided).
 
 ### Iterative Optimization
 For each SQP iteration:
@@ -178,4 +144,6 @@ For each SQP iteration:
 - Updates the current control and prediction with the final guesses.
 - Returns the optimized state and control trajectories.
 
-An example of the SQP solver in use is provided in .
+An example of the NMPC solver in use is provided in , for the path following and velocity control of a simple vehicle modelled with a kinematic bicycle.
+
+

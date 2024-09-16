@@ -60,13 +60,12 @@ class PathFollower:
     def compute_optimal_input(self, current_state, debug=False):
         if not self.stopping:
             X, U, self.stopping = self.fetch_reference(current_state)
-
         if not self.stopping: # If the end of the path is not reached
             X_guess, U_guess = self.mpc_controller.profile_solve_sqp(current_state, X, U, debug=debug)
         else: # Naively stop the car ignoring the deviation from the actual path.
             X = np.zeros((self.mpc_controller.N, self.mpc_controller.nx))
             U = np.zeros((self.mpc_controller.N, self.mpc_controller.nu))
-            self.mpc_controller.Q  = sparse.diags([0, 0, 0, 20]) # State cost matrix - Only control velocity
+            self.mpc_controller.Q  = sparse.diags([0, 0, 0, 20]) # State cost matrix - Only control velocity to stop the car
             X_guess, U_guess= self.mpc_controller.profile_solve_sqp(current_state, X, U, debug=debug)
         return U_guess  
     

@@ -1,3 +1,11 @@
+# The Spline class and the Spline2D class are based on the following code with minor modifications:
+
+# https://github.com/AtsushiSakai/PythonRobotics/blob/master/PathPlanning/CubicSpline/cubic_spline_planner.py
+# The code is licensed under the MIT License - https://github.com/AtsushiSakai/PythonRobotics/blob/master/LICENSE
+# The MIT License (MIT)
+# Copyright (c) 2016 - 2022 Atsushi Sakai and other contributors:
+# https://github.com/AtsushiSakai/PythonRobotics/contributors
+
 import math
 import numpy as np
 import bisect

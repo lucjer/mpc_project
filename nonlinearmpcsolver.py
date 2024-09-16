@@ -48,20 +48,21 @@ class NMPCSolver:
         self.input_constraints = InputConstraints       
 
         # Current state and control
-        self.current_prediction = None
-        self.current_control = None
+        self.current_state_guess = None
+        self.current_input_guess = None
         
         # Initialize the optimizer
         self.optimizer = osqp.OSQP()
         self.sqp_iters = sqp_iters
         self.alpha = alpha
 
-        # Debugging
+        # Debugging parameters - Callback function and folder to save plots
         self.debug_plotting_callback = debug_plotting_callback
         self.debug_plots_folder = debug_plots_folder
 
 
-    def profile_solve_sqp(self, *args, **kwargs): # Used for profiling. Useful for investigating performance bottlenecks
+    def profile_solve_sqp(self, *args, **kwargs): 
+        # Used for profiling. Useful for investigating performance bottlenecks
         profiler = cProfile.Profile()
         profiler.enable()
 
@@ -92,15 +93,15 @@ class NMPCSolver:
         """
         # Initialize guess for the optimization problem - SQP
         if X_guess is None or U_guess is None: # If no guess is provided
-            if self.current_control is not None and self.current_prediction is not None:
+            if self.current_input_guess is not None and self.current_state_guess is not None:
                 # TODO: Improve this initialization
-                U_guess = np.zeros_like(self.current_control)
-                X_guess = np.zeros_like(self.current_prediction)
+                U_guess = np.zeros_like(self.current_input_guess)
+                X_guess = np.zeros_like(self.current_state_guess)
                 # Initialize guess with the previous solution
-                U_guess[0:-1] = self.current_control[1:]
-                X_guess[0:-1] = self.current_prediction[1:]
-                U_guess[-1] = self.current_control[-1] 
-                X_guess[-1] = self.model.step_nonlinear_model(self.current_prediction[-1], self.current_control[-1])
+                U_guess[0:-1] = self.current_input_guess[1:]
+                X_guess[0:-1] = self.current_state_guess[1:]
+                U_guess[-1] = self.current_input_guess[-1] 
+                X_guess[-1] = self.model.step_nonlinear_model(self.current_state_guess[-1], self.current_input_guess[-1])
                 # Duplicate the last state and control
             else:
                 X_guess = X_ref.copy()
@@ -192,7 +193,7 @@ class NMPCSolver:
             self.debug_plotting_callback(current_state, results, folder_path=self.debug_plots_folder)
 
         # Update current state and control guesses for next call to the solver    
-        self.current_control = U_guess
-        self.current_prediction = X_guess
+        self.current_input_guess = U_guess
+        self.current_state_guess = X_guess
         return X_guess, U_guess
 
