@@ -54,7 +54,6 @@ h_{i,k} = h(x_{i,k}^{\text{guess}}, u_{i,k}^{\text{guess}}), \\[10pt]
 J_{i,k} = W_{i,k} \begin{bmatrix} x_{i,k}^{\text{guess}} - x_{i,k}^{\text{ref}} \\ u_{i,k}^{\text{guess}} - u_{i,k}^{\text{ref}} \end{bmatrix}.
 ```
 
-<img src="./readme_imgs/linearizations.png" width="350" />
 
 ### Algorithm 1: SQP for NMPC at Discrete Time $i$
 
