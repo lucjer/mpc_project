@@ -32,18 +32,27 @@ In the SQP approach, the optimization problem is iteratively approximated by qua
 
 At a guess $\left(\boldsymbol{x}_i^{\text {guess }}, \boldsymbol{u}_i^{\text {guess }}\right)$, Problem (9) is approximated by the QP:
 
-![plot](./readme_imgs/QP.png)
-
 
 ```math
 \text{QP}_{\text{NMPC}}(\hat{x}_i^{\text{guess}}, \mathbf{x}_i^{\text{guess}}, \mathbf{u}_i^{\text{guess}}, \mathbf{x}_i^{\text{ref}}, \mathbf{u}_i^{\text{ref}}) = \arg\min_{\Delta x_i, \Delta u_i} \sum_{k=0}^{N-1} \frac{1}{2} \begin{bmatrix} \Delta x_{i,k} \\ \Delta u_{i,k} \end{bmatrix}^\top H_{i,k} \begin{bmatrix} \Delta x_{i,k} \\ \Delta u_{i,k} \end{bmatrix} + J_{i,k}^\top \begin{bmatrix} \Delta x_{i,k} \\ \Delta u_{i,k} \end{bmatrix}
 ```
 
+```math
+\text{QP}_{\text{NMPC}}(\hat{x}_i^{\text{guess}}, \boldsymbol{x}_i^{\text{guess}}, \boldsymbol{u}_i^{\text{guess}}, \boldsymbol{x}_i^{\text{ref}}, \boldsymbol{u}_i^{\text{ref}}) = \arg\min_{\Delta x_i, \Delta u_i} \sum_{k=0}^{N-1} \frac{1}{2} \begin{bmatrix} \Delta x_{i,k} \\ \Delta u_{i,k} \end{bmatrix}^\top H_{i,k} \begin{bmatrix} \Delta x_{i,k} \\ \Delta u_{i,k} \end{bmatrix} + J_{i,k}^\top \begin{bmatrix} \Delta x_{i,k} \\ \Delta u_{i,k} \end{bmatrix}
 
-![plot](./readme_imgs/subject.png)
-
+```
 
 with 
+
+```math
+A_{i,k} = \frac{\partial f(x, u)}{\partial x} \bigg|_{x_{i,k}^{\text{guess}}, u_{i,k}^{\text{guess}}}, \\[10pt]
+B_{i,k} = \frac{\partial f(x, u)}{\partial u} \bigg|_{x_{i,k}^{\text{guess}}, u_{i,k}^{\text{guess}}}, \\[10pt]
+C_{i,k} = \frac{\partial h(x, u)}{\partial x} \bigg|_{x_{i,k}^{\text{guess}}, u_{i,k}^{\text{guess}}}, \\[10pt]
+D_{i,k} = \frac{\partial h(x, u)}{\partial u} \bigg|_{x_{i,k}^{\text{guess}}, u_{i,k}^{\text{guess}}}, \\[10pt]
+r_{i,k} = f(x_{i,k}^{\text{guess}}, u_{i,k}^{\text{guess}}) - x_{i,k+1}^{\text{guess}}, \\[10pt]
+h_{i,k} = h(x_{i,k}^{\text{guess}}, u_{i,k}^{\text{guess}}), \\[10pt]
+J_{i,k} = W_{i,k} \begin{bmatrix} x_{i,k}^{\text{guess}} - x_{i,k}^{\text{ref}} \\ u_{i,k}^{\text{guess}} - u_{i,k}^{\text{ref}} \end{bmatrix}.
+```
 
 <img src="./readme_imgs/linearizations.png" width="350" />
 
