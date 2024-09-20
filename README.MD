@@ -17,7 +17,9 @@ Given the state estimate $\hat{x}_i$ and reference trajectories $\boldsymbol{x}_
 ![plot](./readme_imgs/NLP_general.png)
 
 
-$\text{NLP}(\hat{x}_i, \boldsymbol{x}_i^{\text{ref}}, \boldsymbol{u}_i^{\text{ref}}) = \arg\min_{x, u} \sum_{k=0}^{N-1} \frac{1}{2} \begin{bmatrix} x_{i,k} - \boldsymbol{x}_{i,k}^{\text{ref}} \\ u_{i,k} - \boldsymbol{u}_{i,k}^{\text{ref}} \end{bmatrix}^\top W_{i,k} \begin{bmatrix} x_{i,k} - \boldsymbol{x}_{i,k}^{\text{ref}} \\ u_{i,k} - \boldsymbol{u}_{i,k}^{\text{ref}} \end{bmatrix}$
+```math
+\begin{bmatrix}X\\Y\end{bmatrix}
+```
 
 
 Subject to:
