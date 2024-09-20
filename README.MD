@@ -36,21 +36,31 @@ At a guess $\left(\boldsymbol{x}_i^{\text {guess }}, \boldsymbol{u}_i^{\text {gu
 ```math
 \text{QP}_{\text{NMPC}}(\hat{x}_i^{\text{guess}}, \mathbf{x}_i^{\text{guess}}, \mathbf{u}_i^{\text{guess}}, \mathbf{x}_i^{\text{ref}}, \mathbf{u}_i^{\text{ref}}) = \arg\min_{\Delta x_i, \Delta u_i} \sum_{k=0}^{N-1} \frac{1}{2} \begin{bmatrix} \Delta x_{i,k} \\ \Delta u_{i,k} \end{bmatrix}^\top H_{i,k} \begin{bmatrix} \Delta x_{i,k} \\ \Delta u_{i,k} \end{bmatrix} + J_{i,k}^\top \begin{bmatrix} \Delta x_{i,k} \\ \Delta u_{i,k} \end{bmatrix}
 ```
+subject to
 
 ```math
-\text{QP}_{\text{NMPC}}(\hat{x}_i^{\text{guess}}, \boldsymbol{x}_i^{\text{guess}}, \boldsymbol{u}_i^{\text{guess}}, \boldsymbol{x}_i^{\text{ref}}, \boldsymbol{u}_i^{\text{ref}}) = \arg\min_{\Delta x_i, \Delta u_i} \sum_{k=0}^{N-1} \frac{1}{2} \begin{bmatrix} \Delta x_{i,k} \\ \Delta u_{i,k} \end{bmatrix}^\top H_{i,k} \begin{bmatrix} \Delta x_{i,k} \\ \Delta u_{i,k} \end{bmatrix} + J_{i,k}^\top \begin{bmatrix} \Delta x_{i,k} \\ \Delta u_{i,k} \end{bmatrix}
+\Delta x_{i,0} = \hat{x}_i - x_{i,0}^{\text{guess}}, \\
 
+\Delta x_{i,k+1} = A_{i,k} \Delta x_{i,k} + B_{i,k} \Delta u_{i,k} + r_{i,k}, \\
+
+C_{i,k} \Delta x_{i,k} + D_{i,k} \Delta u_{i,k} + h_{i,k} \leq 0,
 ```
 
 with 
 
 ```math
-A_{i,k} = \frac{\partial f(x, u)}{\partial x} \bigg|_{x_{i,k}^{\text{guess}}, u_{i,k}^{\text{guess}}}, \\[10pt]
-B_{i,k} = \frac{\partial f(x, u)}{\partial u} \bigg|_{x_{i,k}^{\text{guess}}, u_{i,k}^{\text{guess}}}, \\[10pt]
-C_{i,k} = \frac{\partial h(x, u)}{\partial x} \bigg|_{x_{i,k}^{\text{guess}}, u_{i,k}^{\text{guess}}}, \\[10pt]
-D_{i,k} = \frac{\partial h(x, u)}{\partial u} \bigg|_{x_{i,k}^{\text{guess}}, u_{i,k}^{\text{guess}}}, \\[10pt]
-r_{i,k} = f(x_{i,k}^{\text{guess}}, u_{i,k}^{\text{guess}}) - x_{i,k+1}^{\text{guess}}, \\[10pt]
-h_{i,k} = h(x_{i,k}^{\text{guess}}, u_{i,k}^{\text{guess}}), \\[10pt]
+A_{i,k} = \frac{\partial f(x, u)}{\partial x} \bigg|_{x_{i,k}^{\text{guess}}, u_{i,k}^{\text{guess}}}, \\
+
+B_{i,k} = \frac{\partial f(x, u)}{\partial u} \bigg|_{x_{i,k}^{\text{guess}}, u_{i,k}^{\text{guess}}}, \\
+
+C_{i,k} = \frac{\partial h(x, u)}{\partial x} \bigg|_{x_{i,k}^{\text{guess}}, u_{i,k}^{\text{guess}}}, \\
+
+D_{i,k} = \frac{\partial h(x, u)}{\partial u} \bigg|_{x_{i,k}^{\text{guess}}, u_{i,k}^{\text{guess}}}, \\
+
+r_{i,k} = f(x_{i,k}^{\text{guess}}, u_{i,k}^{\text{guess}}) - x_{i,k+1}^{\text{guess}}, \\
+
+h_{i,k} = h(x_{i,k}^{\text{guess}}, u_{i,k}^{\text{guess}}), \\
+
 J_{i,k} = W_{i,k} \begin{bmatrix} x_{i,k}^{\text{guess}} - x_{i,k}^{\text{ref}} \\ u_{i,k}^{\text{guess}} - u_{i,k}^{\text{ref}} \end{bmatrix}.
 ```
 
