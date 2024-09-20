@@ -14,9 +14,6 @@ _The following is from Gros et al. (2020), reported here for convenience._
 Given the state estimate $\hat{x}_i$ and reference trajectories $\boldsymbol{x}_i^{\text{ref}}$ and $\boldsymbol{u}_i^{\text{ref}}$, the optimization problem is:
 
 
-![plot](./readme_imgs/NLP_general.png)
-
-
 ```math
 \text{NLP}(\hat{x}_i, \mathbf{x}_i^{\text{ref}}, \mathbf{u}_i^{\text{ref}}) = \arg\min_{x, u} \sum_{k=0}^{N-1} \frac{1}{2} \begin{bmatrix} x_{i,k} - x_{i,k}^{\text{ref}} \\ u_{i,k} - u_{i,k}^{\text{ref}} \end{bmatrix}^\top W_{i,k} \begin{bmatrix} x_{i,k} - x_{i,k}^{\text{ref}} \\ u_{i,k} - u_{i,k}^{\text{ref}} \end{bmatrix}
 ```
@@ -36,6 +33,12 @@ In the SQP approach, the optimization problem is iteratively approximated by qua
 At a guess $\left(\boldsymbol{x}_i^{\text {guess }}, \boldsymbol{u}_i^{\text {guess }}\right)$, Problem (9) is approximated by the QP:
 
 ![plot](./readme_imgs/QP.png)
+
+
+```math
+\text{QP}_{\text{NMPC}}(\hat{x}_i^{\text{guess}}, \mathbf{x}_i^{\text{guess}}, \mathbf{u}_i^{\text{guess}}, \mathbf{x}_i^{\text{ref}}, \mathbf{u}_i^{\text{ref}}) = \arg\min_{\Delta x_i, \Delta u_i} \sum_{k=0}^{N-1} \frac{1}{2} \begin{bmatrix} \Delta x_{i,k} \\ \Delta u_{i,k} \end{bmatrix}^\top H_{i,k} \begin{bmatrix} \Delta x_{i,k} \\ \Delta u_{i,k} \end{bmatrix} + J_{i,k}^\top \begin{bmatrix} \Delta x_{i,k} \\ \Delta u_{i,k} \end{bmatrix}
+```
+
 
 ![plot](./readme_imgs/subject.png)
 
