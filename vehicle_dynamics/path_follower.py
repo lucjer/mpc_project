@@ -16,7 +16,6 @@ class PathFollower:
         self.path = path # Collection of (X, Y) points that define the path
         self.default_ds = ds # Default distance between points on the path
         self.current_index = None # Index of the current point on the path
-        self.farthest_index = None
         self.mpc_controller = mpc_controller # MPC controller for the vehicle 
         self.velocity_resolution = velocity_resolution # Resolution of the velocity profile
         self.maximum_lateral_acceleration = maximum_lateral_acceleration
@@ -24,7 +23,7 @@ class PathFollower:
         self.ds_resolution = self.velocity_resolution * self.mpc_controller.model.mpc_params['dt'] # Distance between points on the path for the velocity profile
         self.trajectory = {'x': [], 'y': [], 'yaw': [], 'v': [], 'inp': [], 'k':[]} # Trajectory of the vehicle
         self.search_radius = search_radius # Search radius for finding the closest point on the path
-        self.sigma = sigma # Sigma 
+        self.sigma = sigma # Sigma - Smoothening window width for velocity profile
         self.stopping = False
         
     def fetch_reference(self, current_state):
