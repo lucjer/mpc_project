@@ -15,3 +15,5 @@ __pycache__/
 # Profiling files
 *.prof
 
+# File structure tree print
+print_file_structure.sh
