@@ -32,7 +32,7 @@ In the SQP approach, the optimization problem is iteratively approximated by qua
 
 At a guess $\left(\boldsymbol{x}_i^{\text {guess }}, \boldsymbol{u}_i^{\text {guess }}\right)$, Problem (9) is approximated by the QP:
 
-<img src="./readme_imgs/complete.png" width="350" />
+<img src="./readme_imgs/complete.png" width="600" />
 
 
 
