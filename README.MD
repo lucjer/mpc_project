@@ -4,7 +4,8 @@ This repository contains an implementation of a Nonlinear Model Predictive Contr
 
 Gros, S., Zanon, M., Quirynen, R., Bemporad, A., & Diehl, M. (2020). From linear to nonlinear MPC: bridging the gap via the real-time iteration. *International Journal of Control, 93*(1), 62-80. [Link to the Paper](https://cse.lab.imtlucca.it/~bemporad/publications/papers/ijc_rtiltv.pdf)
 
-The purpose of this repository is to demonstrate how to effectively solve a complex NMPC problem using OSQP in Python.
+An example of the NMPC solver in use is provided in the Path Follower [example notebook](vehicle_dynamics/path_following_example.ipynb), for the path following and velocity control of a simple vehicle modelled with a kinematic bicycle. Additional examples of use of the NMPC solver are currently under development.
+
 
 ## Algorithm Details - NMPC and SQP Formulation
 _The following is from Gros et al. (2020), reported here for convenience._ 
@@ -75,7 +76,7 @@ To use the `NMPCSolver`, you must implement a model class that inherits from `MP
 
 - [REQUIRED] **`step_nonlinear_model(state, inp)`**: Implements the discrete-time nonlinear model of the system.
 
-- [REQUIRED] **`linearization_model(state, inp, reference_state, reference_input)`**: Provides the linearized model of the discrete-time nonlinear model of the system.
+- [REQUIRED] **`linearization_model(state, inp)`**: Provides the linearized model of the discrete-time nonlinear model of the system.
 
 - **`nonlinear_model(state, inp)`**: Defines the nonlinear (continuous time) vector field. Not directly used by the `MPCSolver`, this method is useful for simulating the system's dynamics.
 
@@ -134,7 +135,3 @@ For each SQP iteration:
 ### Update and Return
 - Updates the current control and prediction with the final guesses.
 - Returns the optimized state and control trajectories.
-
-An example of the NMPC solver in use is provided in the Path Follower [example notebook](vehicle_dynamics/path_following_example.ipynb), for the path following and velocity control of a simple vehicle modelled with a kinematic bicycle.
-
-
