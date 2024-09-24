@@ -35,7 +35,6 @@ At a guess $\left(\boldsymbol{x}_i^{\text {guess }}, \boldsymbol{u}_i^{\text {gu
 <img src="./readme_imgs/complete.png" width="600" />
 
 
-
 ### Algorithm 1: SQP for NMPC at Discrete Time $i$
 
 **Input:**
@@ -136,6 +135,6 @@ For each SQP iteration:
 - Updates the current control and prediction with the final guesses.
 - Returns the optimized state and control trajectories.
 
-An example of the NMPC solver in use is provided in , for the path following and velocity control of a simple vehicle modelled with a kinematic bicycle.
+An example of the NMPC solver in use is provided in the Path Follower [example notebook](vehicle_dynamics/path_following_example.ipynb), for the path following and velocity control of a simple vehicle modelled with a kinematic bicycle.
 
 
