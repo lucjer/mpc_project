@@ -1,0 +1,17 @@
+# Python cache files
+__pycache__/
+*.py[cod]
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+
+# MacOS system files
+.DS_Store
+
+# Auto-generated plot and simulation files
+*.pdf
+*.gif
+
+# Profiling files
+*.prof
+
