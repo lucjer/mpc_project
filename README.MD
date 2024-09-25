@@ -16,7 +16,7 @@ An example of the NMPC solver in use is provided in the Path Follower [example n
 ## Inspiration and Design
 
 The implementation of the NMPCSolver class draws some inspiration from the [Linear MPC class](https://github.com/matssteinweg/Multi-Purpose-MPC/blob/master/src/MPC.py) found in a public repository by Mats Steinweg. Compared to the former, this solver does not assume any specific dynamical model (e.g., vehicle model). It is designed to be general-purpose, capable of handling a wide range of dynamical systems with minimal adaptation.
-Furthermore, the solver developed in this repository uses an SQP implementation for the solution of the NMPC problem. For more details on the Nonlinear MPC formulation, see the [Algorithm Details](##algorithm-details---nmpc-and-sqp-formulation) section.
+Furthermore, the solver developed in this repository uses an SQP implementation for the solution of the NMPC problem. For more details on the Nonlinear MPC formulation, see the [Algorithm Details](#algorithm-details---nmpc-and-sqp-formulation).
 
 
 ## Overview
