@@ -16,12 +16,12 @@ An example of the NMPC solver in use is provided in the Path Follower [example n
 ## Inspiration and Design
 
 The implementation of the NMPCSolver class draws some inspiration from the [Linear MPC class](https://github.com/matssteinweg/Multi-Purpose-MPC/blob/master/src/MPC.py) found in a public repository by Mats Steinweg. Compared to the former, this solver does not assume any specific dynamical model (e.g., vehicle model). It is designed to be general-purpose, capable of handling a wide range of dynamical systems with minimal adaptation.
-Furthermore, the solver developed in this repository uses an SQP implementation for the solution of the NMPC problem. For more details on the Nonlinear MPC formulation, see the [Algorithm Details](#algorithm-details---nmpc-and-sqp-formulation).
+Furthermore, the solver developed in this repository uses an SQP implementation for the solution of the NMPC problem. For more details on the Nonlinear MPC formulation, see [Algorithm Details](#algorithm-details---nmpc-and-sqp-formulation).
 
 
 ## Overview
 
-The `NMPCSolver` class is designed to work with any system that can be described by the `MPCModel` abstract class. It uses the OSQP (Operator Splitting Quadratic Program) solver for the optimization at each SQP step. [NMPCSolver class definition](nonlinearmpcsolver.py)
+The `NMPCSolver` class is designed to work with any system that can be described by the `MPCModel` abstract class. It uses the [OSQP](https://osqp.org) (Operator Splitting Quadratic Program) solver for the optimization at each SQP step. [NMPCSolver class definition](nonlinearmpcsolver.py)
 
 # NMPC Solver - How to use
 
@@ -46,8 +46,8 @@ solver = NMPCSolver(model, N, Q, R, state_constraints, input_constraints)
 
 - **`model`**: An instance of a class derived from `MPCModel`. 
 - **`N`**: The number of prediction steps.
-- **`Q`**: State cost matrix, defines the cost associated with the state deviations.
-- **`R`**: Input cost matrix, defines the cost associated with the control inputs.
+- **`Q`**: State cost matrix, defines the cost associated with the state deviations from the reference trajectory.
+- **`R`**: Input cost matrix, defines the cost associated with the control inputs deviations from the reference trajectory.
 - **`state_constraints`**: A dictionary defining constraints on the state variables.
 - **`input_constraints`**: A dictionary defining constraints on the control inputs.
 
@@ -103,6 +103,8 @@ The following features are currently under development.
 - [ ] **Implement Control Constraints**
   - [X] Implement Linear Control Constraints
   - [ ] Implement Nonlinear Control Constraints
+
+- [ ] **Implement Control Variations Cost and Constraints**
 
 - [ ] **Implement Non-Quadratic Cost functions**
 
