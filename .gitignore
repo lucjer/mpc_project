@@ -17,3 +17,6 @@ __pycache__/
 
 # File structure tree print
 print_file_structure.sh
+
+#
+.vscode/

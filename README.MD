@@ -135,3 +135,18 @@ For each SQP iteration:
 ### Update and Return
 - Updates the current control and prediction with the final guesses.
 - Returns the optimized state and control trajectories.
+
+
+## TODO List
+
+The following features are currently under development.
+
+- [ ] **Implement State Constraints**
+  - [ ] Implement Linear State Constraints
+  - [ ] Implement Nonlinear State Constraints
+
+- [ ] **Implement Control Constraints**
+  - [X] Implement Linear Control Constraints
+  - [ ] Implement Nonlinear Control Constraints
+
+- [ ] **Implement Non-Quadratic Cost functions**
