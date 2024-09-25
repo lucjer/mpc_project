@@ -9,72 +9,21 @@ An example of the NMPC solver in use is provided in the Path Follower [example n
 <img src="./readme_imgs/trajectory_animation.gif" width="600" />
 
 
-
  Additional examples of use of the NMPC solver are currently under development.
-
-
-## Algorithm Details - NMPC and SQP Formulation
-_The following is from Gros et al. (2020), reported here for convenience._ 
- 
-**Nonlinear Programming (NLP) Problem:**
-
-Given the state estimate $\hat{x}_i$ and reference trajectories $\boldsymbol{x}_i^{\text{ref}}$ and $\boldsymbol{u}_i^{\text{ref}}$, the optimization problem is:
-
-
-```math
-\text{NLP}(\hat{x}_i, \mathbf{x}_i^{\text{ref}}, \mathbf{u}_i^{\text{ref}}) = \arg\min_{x, u} \sum_{k=0}^{N-1} \frac{1}{2} \begin{bmatrix} x_{i,k} - x_{i,k}^{\text{ref}} \\ u_{i,k} - u_{i,k}^{\text{ref}} \end{bmatrix}^\top W_{i,k} \begin{bmatrix} x_{i,k} - x_{i,k}^{\text{ref}} \\ u_{i,k} - u_{i,k}^{\text{ref}} \end{bmatrix}
-```
-
-
-Subject to:
-
-- Initial state: $x_{i, 0} = \hat{x}_i$
-- System's dynamics: $x_{i, k+1} = f(x_{i, k}, u_{i, k})$ for $k = 0, \dots, N-1$
-
-
-**Sequential quadratic programming (SQP) for NMPC**
-
-In the SQP approach, the optimization problem is iteratively approximated by quadratic programming (QP) problems. Each QP provides a Newton direction, guiding steps toward the solution from the current guess. These steps, partial or full, are repeated until convergence.
-
-
-At a guess $\left(\boldsymbol{x}_i^{\text {guess }}, \boldsymbol{u}_i^{\text {guess }}\right)$, Problem (9) is approximated by the QP:
-
-<img src="./readme_imgs/complete.png" width="600" />
-
-
-### Algorithm 1: SQP for NMPC at Discrete Time $i$
-
-**Input:**
-- Current state estimate $\hat{x}_i$
-- Reference trajectory $(\boldsymbol{x}_i^{\text{ref}}, \boldsymbol{u}_i^{\text{ref}})$
-- Initial guess $(\boldsymbol{x}_i^{\text{guess}}, \boldsymbol{u}_i^{\text{guess}})$
-
-**Procedure:**
-
-1. **While** the solution has not converged:
-   1. Evaluate $r_{i,k}$, $h_{i,k}$, and the sensitivities $A_{i,k}$, $B_{i,k}$, $C_{i,k}$, $D_{i,k}$, $H_{i,k}$, $J_{i,k}$.
-   2. Construct and solve the quadratic program $\text{QP}_{\text{NMPC}}(\hat{x}_i, \boldsymbol{x}_i^{\text{guess}}, \boldsymbol{u}_i^{\text{guess}}, \boldsymbol{x}_i^{\text{ref}}, \boldsymbol{u}_i^{\text{ref}})$ to obtain the Newton direction $(\Delta \boldsymbol{x}_i, \Delta \boldsymbol{u}_i)$.
-   3. Update the guess with the Newton step:
-      $(\boldsymbol{x}_i^{\text{guess}}, \boldsymbol{u}_i^{\text{guess}}) \leftarrow (\boldsymbol{x}_i^{\text{guess}}, \boldsymbol{u}_i^{\text{guess}}) + \alpha (\Delta \boldsymbol{x}_i, \Delta \boldsymbol{u}_i)$
-
-2. **End While**
-
-**Output:**
-- NMPC solution $(x_i, u_i) = (\boldsymbol{x}_i^{\text{guess}}, \boldsymbol{u}_i^{\text{guess}})$
 
 # Implementation Details
 
 ## Inspiration and Design
 
 The implementation of the NMPCSolver class draws some inspiration from the [Linear MPC class](https://github.com/matssteinweg/Multi-Purpose-MPC/blob/master/src/MPC.py) found in a public repository by Mats Steinweg. Compared to the former, this solver does not assume any specific dynamical model (e.g., vehicle model). It is designed to be general-purpose, capable of handling a wide range of dynamical systems with minimal adaptation.
-Furthermore, this solver uses an SQP implementation for the solution of the NMPC problem.
+Furthermore, the solver developed in this repository uses an SQP implementation for the solution of the NMPC problem. For more details on the Nonlinear MPC formulation, see the [Algorithm Details](##algorithm-details---nmpc-and-sqp-formulation) section.
+
 
 ## Overview
 
-The `NMPCSolver` class is designed to work with any system that can be described by the `MPCModel` abstract class. It uses the OSQP (Operator Splitting Quadratic Program) solver for the optimization at each SQP step.
+The `NMPCSolver` class is designed to work with any system that can be described by the `MPCModel` abstract class. It uses the OSQP (Operator Splitting Quadratic Program) solver for the optimization at each SQP step. [NMPCSolver class definition](nonlinearmpcsolver.py)
 
 # NMPC Solver - How to use
-
 
 ## MPCModel Interface
 
@@ -156,3 +105,53 @@ The following features are currently under development.
   - [ ] Implement Nonlinear Control Constraints
 
 - [ ] **Implement Non-Quadratic Cost functions**
+
+
+## Algorithm Details - NMPC and SQP Formulation
+_The following is from Gros et al. (2020), reported here for convenience._ 
+ 
+**Nonlinear Programming (NLP) Problem:**
+
+Given the state estimate $\hat{x}_i$ and reference trajectories $\boldsymbol{x}_i^{\text{ref}}$ and $\boldsymbol{u}_i^{\text{ref}}$, the optimization problem is:
+
+
+```math
+\text{NLP}(\hat{x}_i, \mathbf{x}_i^{\text{ref}}, \mathbf{u}_i^{\text{ref}}) = \arg\min_{x, u} \sum_{k=0}^{N-1} \frac{1}{2} \begin{bmatrix} x_{i,k} - x_{i,k}^{\text{ref}} \\ u_{i,k} - u_{i,k}^{\text{ref}} \end{bmatrix}^\top W_{i,k} \begin{bmatrix} x_{i,k} - x_{i,k}^{\text{ref}} \\ u_{i,k} - u_{i,k}^{\text{ref}} \end{bmatrix}
+```
+
+
+Subject to:
+
+- Initial state: $x_{i, 0} = \hat{x}_i$
+- System's dynamics: $x_{i, k+1} = f(x_{i, k}, u_{i, k})$ for $k = 0, \dots, N-1$
+
+
+**Sequential quadratic programming (SQP) for NMPC**
+
+In the SQP approach, the optimization problem is iteratively approximated by quadratic programming (QP) problems. Each QP provides a Newton direction, guiding steps toward the solution from the current guess. These steps, partial or full, are repeated until convergence.
+
+
+At a guess $\left(\boldsymbol{x}_i^{\text {guess }}, \boldsymbol{u}_i^{\text {guess }}\right)$, Problem (9) is approximated by the QP:
+
+<img src="./readme_imgs/complete.png" width="600" />
+
+
+### Algorithm 1: SQP for NMPC at Discrete Time $i$
+
+**Input:**
+- Current state estimate $\hat{x}_i$
+- Reference trajectory $(\boldsymbol{x}_i^{\text{ref}}, \boldsymbol{u}_i^{\text{ref}})$
+- Initial guess $(\boldsymbol{x}_i^{\text{guess}}, \boldsymbol{u}_i^{\text{guess}})$
+
+**Procedure:**
+
+1. **While** the solution has not converged:
+   1. Evaluate $r_{i,k}$, $h_{i,k}$, and the sensitivities $A_{i,k}$, $B_{i,k}$, $C_{i,k}$, $D_{i,k}$, $H_{i,k}$, $J_{i,k}$.
+   2. Construct and solve the quadratic program $\text{QP}_{\text{NMPC}}(\hat{x}_i, \boldsymbol{x}_i^{\text{guess}}, \boldsymbol{u}_i^{\text{guess}}, \boldsymbol{x}_i^{\text{ref}}, \boldsymbol{u}_i^{\text{ref}})$ to obtain the Newton direction $(\Delta \boldsymbol{x}_i, \Delta \boldsymbol{u}_i)$.
+   3. Update the guess with the Newton step:
+      $(\boldsymbol{x}_i^{\text{guess}}, \boldsymbol{u}_i^{\text{guess}}) \leftarrow (\boldsymbol{x}_i^{\text{guess}}, \boldsymbol{u}_i^{\text{guess}}) + \alpha (\Delta \boldsymbol{x}_i, \Delta \boldsymbol{u}_i)$
+
+2. **End While**
+
+**Output:**
+- NMPC solution $(x_i, u_i) = (\boldsymbol{x}_i^{\text{guess}}, \boldsymbol{u}_i^{\text{guess}})$
