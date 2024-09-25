@@ -1,10 +1,10 @@
 # Nonlinear Model Predictive Control (NMPC) Solver
 
-This repository contains an implementation of a Nonlinear Model Predictive Control (NMPC) solver, utilizing Sequential Quadratic Programming (SQP) and Real-Time Iteration (RTI) algorithms as presented in the following paper:
+This repository contains an implementation of a Nonlinear Model Predictive Control (NMPC) solver, utilizing Sequential Quadratic Programming (SQP) and Real-Time Iteration (RTI) algorithms as in the paper:
 
 Gros, S., Zanon, M., Quirynen, R., Bemporad, A., & Diehl, M. (2020). From linear to nonlinear MPC: bridging the gap via the real-time iteration. *International Journal of Control, 93*(1), 62-80. [Link to the Paper](https://cse.lab.imtlucca.it/~bemporad/publications/papers/ijc_rtiltv.pdf)
 
-An example of the NMPC solver in use is provided in the Path Follower [example notebook](vehicle_dynamics/path_following_example.ipynb), for the path following and velocity control of a simple vehicle modelled with a kinematic bicycle. Below is an animation showing the MPC controller in action for path following and velocity tracking.
+An example of the NMPC solver in use is provided in the Path Follower [example notebook](vehicle_dynamics/path_following_example.ipynb), for the path following and velocity tracking of a simple vehicle modelled with a kinematic bicycle. Below is an animation showing the MPC controller in action for path following and velocity tracking.
 
 <img src="./readme_imgs/trajectory_animation.gif" width="600" />
 

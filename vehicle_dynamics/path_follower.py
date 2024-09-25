@@ -76,9 +76,9 @@ class PathFollower:
             self.trajectory['yaw'].append(ryaw_i)
             ref_velocity = min(np.sqrt(self.maximum_lateral_acceleration / np.abs(rk_i + 0.01)), self.maximum_velocity)
             self.trajectory['v'].append(ref_velocity)
-            # TODO: Add the acceleration input to the trajectory. 
-            # For now, set it to 0, optimization can handle it and minimize acceleration inputs (deviation from 0)
-            self.trajectory['inp'].append([float(rsteer_i), 0.])
+            # TODO: Add the acceleration and steering input to the trajectory. 
+            # For now, set it to 0, optimization can handle it and minimize acceleration and steering inputs (deviations from 0)
+            self.trajectory['inp'].append([float(rsteer_i) * 0, 0.])
             self.trajectory['k'].append(np.abs(rk_i))
         self.trajectory['v'] = gaussian_filter1d(self.trajectory['v'], sigma=self.sigma)
 

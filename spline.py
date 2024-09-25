@@ -174,7 +174,7 @@ class Spline2D:
 
 
 def calc_spline_course(x, y, ds=0.1):
-    # TODO: Add dependency with respect to the car wheelbase
+    # TODO: Add dependency with respect to the car wheelbase. Currently information is not used, therefore low priority
     sp = Spline2D(x, y)
     s = list(np.arange(0, sp.s[-1], ds))
 
